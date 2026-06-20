@@ -1,0 +1,7 @@
+# QA profile.
+logging:
+  level:
+    com.liverpool.ms_home: INFO
+springdoc:
+  swagger-ui:
+    enabled: true

@@ -1,0 +1,7 @@
+# DEV profile — local development convenience.
+logging:
+  level:
+    com.liverpool.ms_home: DEBUG
+springdoc:
+  swagger-ui:
+    enabled: true

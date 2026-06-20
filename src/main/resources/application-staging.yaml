@@ -1,0 +1,7 @@
+# STAGING profile — production-like.
+logging:
+  level:
+    com.liverpool.ms_home: INFO
+springdoc:
+  swagger-ui:
+    enabled: true

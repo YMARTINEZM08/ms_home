@@ -1,0 +1,73 @@
+spring:
+  application:
+    name: ms-home
+  # Rule 3.1 / Rule 4 — virtual threads for Spring MVC (Java 21 Loom).
+  threads:
+    virtual:
+      enabled: true
+  # Rule 6 — never hardcode infra. Everything below is env-overridable.
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: ${REDIS_TIMEOUT:2s}
+
+# Rule 5 — graceful shutdown for Cloud Run.
+server:
+  shutdown: graceful
+
+# Rule 11 + logger-handler — structured JSON logging, runtime-configurable levels.
+logging:
+  structured:
+    format:
+      console: ecs
+  level:
+    root: INFO
+    com.liverpool.ms_home: ${LOG_LEVEL_APP:INFO}
+
+# Rule 9 — observability. Health probes + restricted actuator surface (security).
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,loggers,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+# Rule 6 — content-service (Contentstack proxy) integration contract. No secrets in code.
+content-service:
+  base-url: ${CONTENT_SERVICE_BASE_URL:http://localhost:8081}
+  default-brand: ${CONTENT_SERVICE_BRAND:LP}
+  preview-header: x-preview
+  connect-timeout: ${CONTENT_SERVICE_CONNECT_TIMEOUT:2s}
+  read-timeout: ${CONTENT_SERVICE_READ_TIMEOUT:5s}
+
+# User requirement — circuit breakers: 5% failure-rate threshold, NO retries.
+# Consumed programmatically by Resilience4jConfig (core Resilience4j, not the Spring-AOP starter).
+resilience:
+  circuit-breaker:
+    failure-rate-threshold: ${CB_FAILURE_RATE_THRESHOLD:5}
+    sliding-window-size: ${CB_SLIDING_WINDOW_SIZE:50}
+    minimum-number-of-calls: ${CB_MIN_CALLS:20}
+    wait-duration-in-open-state: ${CB_WAIT_OPEN:30s}
+    permitted-calls-in-half-open-state: ${CB_HALF_OPEN_CALLS:5}
+
+# Home composition feature flags (Rule 18) — per-block runtime enable/disable, no redeploy.
+home:
+  feature-flags:
+    products-list-salesforce: ${FF_PRODUCTS_LIST_SALESFORCE:true}
+  blocks:
+    # Resolution endpoint paths advertised in dynamic placeholders.
+    products-list-salesforce-endpoint: /home/blocks/products-list
+
+springdoc:
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
