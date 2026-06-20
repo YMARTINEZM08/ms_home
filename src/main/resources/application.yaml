@@ -49,6 +49,10 @@ content-service:
   preview-header: x-preview
   connect-timeout: ${CONTENT_SERVICE_CONNECT_TIMEOUT:2s}
   read-timeout: ${CONTENT_SERVICE_READ_TIMEOUT:5s}
+  home-content-type: ${CONTENT_SERVICE_HOME_TYPE:page}
+  home-entry-id: ${CONTENT_SERVICE_HOME_ENTRY:home}
+  cache-ttl: ${CONTENT_SERVICE_CACHE_TTL:5m}
+  l1-cache-ttl: ${CONTENT_SERVICE_L1_CACHE_TTL:30s}
 
 # User requirement — circuit breakers: 5% failure-rate threshold, NO retries.
 # Consumed programmatically by Resilience4jConfig (core Resilience4j, not the Spring-AOP starter).

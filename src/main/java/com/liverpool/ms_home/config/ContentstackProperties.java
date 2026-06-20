@@ -16,6 +16,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param previewHeader  inbound request header whose presence switches the brand to preview mode
  * @param connectTimeout TCP connect timeout for outbound calls
  * @param readTimeout    response read timeout for outbound calls
+ * @param homeContentType Contentstack content-type uid for the Home page entry (e.g. {@code page})
+ * @param homeEntryId    Contentstack entry id for the Home root (e.g. {@code home})
+ * @param cacheTtl       Redis L2 cache TTL for static Home definitions
+ * @param l1CacheTtl     Caffeine L1 cache TTL for static Home definitions (in-process)
  */
 @ConfigurationProperties(prefix = "content-service")
 public record ContentstackProperties(
@@ -23,5 +27,9 @@ public record ContentstackProperties(
         String defaultBrand,
         String previewHeader,
         Duration connectTimeout,
-        Duration readTimeout) {
+        Duration readTimeout,
+        String homeContentType,
+        String homeEntryId,
+        Duration cacheTtl,
+        Duration l1CacheTtl) {
 }

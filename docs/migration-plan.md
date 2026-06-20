@@ -21,14 +21,14 @@
    validated upstream token, secure headers, secrets via env, minimal downstream header allow-list,
    restricted actuator, dependency scanning).
 
-## Current status — snapshot 2026-06-19
+## Current status — snapshot 2026-06-20
 
 | Phase | State | Notes |
 |---|---|---|
 | 0 — Foundation | ✅ Complete | pom + yaml + 4 profiles compile cleanly. |
 | 1 — Config | ✅ Complete (1 deferred) | Properties, Resilience4jConfig, RestClientConfig + interceptor, SecurityConfig done & compiling. **OpenApiConfig deferred** — springdoc has no verified Spring Boot 4.1 release. |
-| 2 — Domain | 🟡 In progress | All domain sources written (models, errors, ports, composition service); **compile verification of this phase is still pending** (paused before running `mvnw compile`). |
-| 3 — Outbound adapters | ⬜ Pending | ContentServiceClient, SessionContextAdapter, FeatureFlagAdapter, StaticBlockCacheAdapter. |
+| 2 — Domain | ✅ Complete | All domain sources written and compiling cleanly. |
+| 3 — Outbound adapters | ✅ Complete | ContentServiceClient (ContentPort + CB), SessionContextAdapter, FeatureFlagAdapter, StaticBlockCacheAdapter (Redis L2 + Caffeine L1). Also added: StaticBlockCachePort, HomeProperties, CacheConfig, cache TTL fields in ContentstackProperties. Compiles clean. |
 | 4 — Application use cases | ⬜ Pending | GetHomePageService, ProductsListResolveService (+ DomainBeansConfig to wire the pure composition service). |
 | 5 — Inbound REST | ⬜ Pending | HomeController, ProductsListResolveController, DTOs, mappers, RestControllerAdvice. |
 | 6 — Representative blocks | ⬜ Pending | Static banner (cached) + dynamic products_list (placeholder + endpoint + CB). |
@@ -36,15 +36,16 @@
 | 8 — Docs | 🟡 Partial | This migration-plan.md exists; architecture/decisions/integrations/deployment/changelog/error-handling not yet written. |
 | 9 — Tests & verify | ⬜ Pending | Unit/WireMock/Testcontainers/CB tests; `./mvnw clean verify`. |
 
-**Files written so far (Phases 0–2):**
-- Config: `config/{ContentstackProperties,ResilienceProperties,Resilience4jConfig,OutboundLoggingInterceptor,RestClientConfig,SecurityConfig}.java`
+**Files written so far (Phases 0–3):**
+- Config: `config/{ContentstackProperties,ResilienceProperties,Resilience4jConfig,OutboundLoggingInterceptor,RestClientConfig,SecurityConfig,HomeProperties,CacheConfig}.java`
 - Domain models: `domain/model/home/*` (BlockKind, BlockType, AudienceFilter, DynamicBlockStatus, SessionContext, HomeBlock, StaticBlock, DynamicPlaceholder, HomePage, HomePageQuery, BlockResolution, BlockResolutionCatalog), `domain/model/content/*` (ContentQuery, BlockDefinition, HomeDefinition), `domain/model/block/productslist/*` (ProductsListQuery, ProductItem, ProductsListResolution)
 - Domain errors: `domain/error/*` (ErrorCategory, ErrorCodes, HomeException, ValidationException, HomeDefinitionNotFoundException, ContentServiceUnavailableException, DynamicBlockServiceUnavailableException, ServiceUnavailableException)
-- Ports: `domain/port/inbound/*` (GetHomePageUseCase, ResolveProductsListUseCase), `domain/port/outbound/*` (ContentPort, SessionContextPort, FeatureFlagPort, ProductsListPort)
+- Ports: `domain/port/inbound/*` (GetHomePageUseCase, ResolveProductsListUseCase), `domain/port/outbound/*` (ContentPort, SessionContextPort, FeatureFlagPort, ProductsListPort, **StaticBlockCachePort**)
 - Domain service: `domain/service/HomeCompositionService.java`
+- Adapters: `adapter/outbound/contentstack/ContentServiceClient.java`, `adapter/outbound/session/SessionContextAdapter.java`, `adapter/outbound/featureflag/FeatureFlagAdapter.java`, `adapter/outbound/redis/StaticBlockCacheAdapter.java`
 - App: `MsHomeApplication` annotated with `@ConfigurationPropertiesScan`.
 
-**Immediate next step:** run `./mvnw compile` to verify Phase 2, then proceed to Phase 3.
+**Immediate next step:** Phase 4 — application use cases (`GetHomePageService`, `ProductsListResolveService`, `DomainBeansConfig`).
 
 ## Platform notes (discovered during build)
 - Spring Boot **4.1.0** / Java 21. Module naming differs from Boot 3.x (`spring-boot-starter-webmvc`,
@@ -73,7 +74,7 @@
 - [ ] `SecurityConfig`: stateless, secure response headers, restricted actuator, Swagger non-prod.
 - [ ] `OpenApiConfig` (deferred/optional pending springdoc↔Boot4 compatibility — see Phase 8 note).
 
-### Phase 2 — Domain layer (no Spring; records, sealed interfaces, pure logic) 🟡 code-complete, compile pending
+### Phase 2 — Domain layer (no Spring; records, sealed interfaces, pure logic) ✅
 - [x] `domain/model/home`: `HomePage`, `HomeBlock` (sealed) + `StaticBlock`/`DynamicPlaceholder`,
       `BlockType`/`BlockKind`, `AudienceFilter`, `DynamicBlockStatus`, `SessionContext`, `HomePageQuery`,
       `BlockResolution`/`BlockResolutionCatalog`.
@@ -86,14 +87,16 @@
 - [x] `domain/port/outbound`: `ContentPort`, `SessionContextPort`, `FeatureFlagPort`, `ProductsListPort`.
 - [x] `domain/service`: `HomeCompositionService` (ordering, audience/channel visibility, static/dynamic
       classification, feature-flag-driven placeholder status). Pure — no Spring, no I/O.
-- [ ] **TODO (remaining in Phase 2):** run `./mvnw compile` and fix any compile errors; add a unit test for
-      `HomeCompositionService` (deferred to Phase 9 per plan, but the service is the prime unit-test target).
+- [x] `./mvnw compile` clean.
 
-### Phase 3 — Outbound adapters
-- [ ] `ContentServiceClient` (RestClient → content-service proxy; URL-encode segments; map template→domain; circuit breaker).
-- [ ] `SessionContextAdapter` (login/guest from validated upstream token/header).
-- [ ] `FeatureFlagAdapter` (config-backed; runtime toggles).
-- [ ] `StaticBlockCacheAdapter` (Redis L2; Caffeine optional L1).
+### Phase 3 — Outbound adapters ✅
+- [x] `ContentServiceClient` — RestClient → content-service proxy; URL-encodes path via `UriComponentsBuilder`; maps `top_layout + layout + bottom_layout` → `HomeDefinition`; circuit breaker `content-service` (5% threshold, no retries); 404→`HomeDefinitionNotFoundException`, open CB→`ServiceUnavailableException`, I/O→`ContentServiceUnavailableException`.
+- [x] `SessionContextAdapter` — `@RequestScope` bean; reads `x-authenticated`, `x-brand-id`, `x-channel`, `x-locale` headers set by the upstream API gateway; safe defaults.
+- [x] `FeatureFlagAdapter` — maps `FeatureFlagPort.isEnabled(flagId)` to `home.feature-flags.*` config map; unknown flag defaults to false.
+- [x] `StaticBlockCacheAdapter` — `StaticBlockCachePort`; L1 Caffeine (configured via `CacheConfig`); L2 Redis (`StringRedisTemplate` + Jackson 3 `ObjectMapper`); key `home:def:{brand}:{locale}:{path}:{preview}`; Redis errors on read/write are defensive (warn + continue).
+- [x] Added: `domain/port/outbound/StaticBlockCachePort.java`, `config/HomeProperties.java`, `config/CacheConfig.java`; updated `ContentstackProperties` with `homeContentType`, `homeEntryId`, `cacheTtl`, `l1CacheTtl`; updated `application.yaml`.
+- [x] **Platform note:** Spring Boot 4.1 ships Jackson 3 (`tools.jackson.*` packages); fixed imports accordingly.
+- [x] `./mvnw compile` clean, no warnings.
 
 ### Phase 4 — Application use cases
 - [ ] `GetHomePageService` (@Service) — orchestrates composition.
