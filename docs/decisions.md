@@ -182,6 +182,45 @@ to `tools.jackson.*` package names. This is a breaking change from Jackson 2.x.
 
 ---
 
+## ADR-011 — Channel and audience filtering: template-based routing, field-based fallback
+
+**Status:** Active  
+**Context:** `HomeCompositionService.isVisible()` applies two guards before including a block:
+1. **Audience filter** — `audience_filter` field (`"logged"` / `"guest"` / `"all"`).
+2. **Channel visibility** — `enable_on_web` / `enable_on_apps` boolean fields.
+
+Gap analysis (Phase 13) of the live BFF response against the production Contentstack home template
+revealed that **none of these fields appear on any of the 16 home template blocks**. They appear
+only in `globalData` entries (value `"all"`). Additionally, the BFF returned `container_guest` for
+an authenticated session, confirming it is not server-filtered.
+
+**Decision:** Channel and audience routing for the home page is **template-based**, not
+field-based: the upstream caller supplies a different `path` query parameter for each channel
+(`/tienda/home` for web, a separate path for apps), and Contentstack serves the matching template.
+The server-side filtering guards in `HomeCompositionService.isVisible()` are **preserved**:
+
+- **Absence of fields defaults to permissive** — `enable_on_web`/`enable_on_apps` absent →
+  both default to `true`; `audience_filter` absent → resolves to `ALL`. All production home blocks
+  therefore pass visibility without being filtered.
+- **Legacy content remains handled** — the three-section schema (`top_layout + layout +
+  bottom_layout`) uses `_uid`, explicit channel flags, and `audience_filter`. The guards protect
+  this content class without any code branching.
+- **`container_guest`** is returned to all sessions; rendering for guest-only is a
+  **frontend concern** driven by the session context, not a server filter from ms-home. The block
+  type name is a CMS editorial convention, not a CMS-enforced audience restriction.
+
+**Consequences:**
+- `HomeCompositionService.isVisible()` is functionally a no-op for current production home blocks
+  (all fields absent → all defaults pass). This is intentional and correct.
+- If the CMS team ever adds explicit `audience_filter` or channel flags to home blocks, the
+  filtering activates automatically with no code change.
+- If a future template-based channel routing change is needed (e.g., the `path` convention
+  changes), only `ContentServiceClient.buildUri()` needs updating.
+- `container_guest` behaviour change (make it server-filtered) requires the CMS to add
+  `audience_filter: "guest"` to the block, or a new ADR overriding this decision.
+
+---
+
 ## ADR-010 — Actuator on a dedicated management port
 
 **Status:** Active  

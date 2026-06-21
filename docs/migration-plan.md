@@ -44,7 +44,7 @@
 | **10 — Fix CMS schema (P0)** | ✅ Complete | `template.blocks[]` primary + legacy fallback; absent channel flags default to `true`; `uid`/`_uid` dual-read; 6 real BlockTypes added. 59 tests / 0 failures. |
 | **11 — Block content contracts** | ✅ Complete | `BlockContentNormalizer` strips CMS metadata and renames fields for all 6 production types. Schemas documented in `integrations.md §5`. 16 new tests. |
 | **12 — SEO / page metadata** | ✅ Complete | `pageTitle` + `seo{}` added to `HomeDefinition`, `HomePage`, `HomePageResponse`; extracted from top-level CMS response in `ContentServiceClient`. 70 tests / 0 failures. |
-| 13 — Channel/audience validation | ⬜ | Confirm CMS filtering mechanism with content team. |
+| **13 — Channel/audience validation** | ✅ Complete | Template-based routing confirmed from BFF gap analysis. All production home blocks omit filter fields → defaults are permissive. `container_guest` is frontend-rendered. ADR-011 added. No code changes. |
 | 14 — GlobalData endpoint | ⬜ | Feature flags, public_variables, themes. |
 | 15 — Salesforce e2e | ⬜ | Find Salesforce block in CMS; validate full dynamic flow. |
 | 16 — Header/footer strategy | ⬜ | Bundle vs. dedicated endpoint decision + implementation. | 56 tests across 7 test classes, 0 failures. `./mvnw clean verify` → BUILD SUCCESS. Key fixes: `@Qualifier("contentServiceRestClient")` on `ContentServiceClient`, `ConstraintViolationException` handler added to `GlobalExceptionHandler`, Spring Boot 4.1 package `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`, `lenient()` stubbing for L1-hit Redis test. |

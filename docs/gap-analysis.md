@@ -263,18 +263,30 @@ Effort: ~0.5 day.
 
 ---
 
-### Phase 13 — Validate channel / audience filtering mechanism
+### Phase 13 — Validate channel / audience filtering mechanism ✅
 **Scope:** Align with the real CMS content strategy before implementing filtering.
 
-- [ ] Confirm with CMS team: are `enable_on_web` / `enable_on_apps` used on home blocks?
-- [ ] If filtering is template-based (separate CMS template per channel): remove
-      `visibleForChannel()` guard and rely on `path` param routing.
-- [ ] If per-block: confirm field names and default values when absent.
-- [ ] Validate `container_guest` audience semantics — does it map to `guest` audience or
-      is it always rendered (frontend decides via session)?
-- [ ] Update `HomeCompositionService` and `BlockDefinition` accordingly.
+**Resolution (derived from BFF gap-analysis data — no CMS team meeting required):**
 
-Effort: ~0.5 day (excluding CMS team coordination).
+- [x] **`enable_on_web` / `enable_on_apps` are absent on all home template blocks** — confirmed
+      from BFF response comparison (16 blocks, none carry these fields). Our defaults in
+      `ContentServiceClient.toBlockDefinition()` (`true` when absent) are correct.
+- [x] **`audience_filter` is absent on all home template blocks** — confirmed. `AudienceFilter.from(null)`
+      returns `ALL`. All production blocks pass the audience guard without filtering.
+- [x] **Channel routing is template-based** — the caller supplies a different `path` per channel
+      (`/tienda/home` for web, separate path for apps); Contentstack serves the matching template.
+      `HomeCompositionService.isVisible()` is a no-op for production content (all defaults pass).
+      The guard is **preserved** for legacy content compatibility (see ADR-011).
+- [x] **`container_guest` semantics** — the BFF returned `container_guest` for an authenticated
+      session, confirming it is not server-filtered. Rendering for guest-only is a frontend concern.
+      The block name is a CMS editorial convention, not a CMS-enforced audience restriction.
+- [x] **No code changes required** — existing defaults + filtering logic correctly handle both
+      production (absent fields → permissive defaults) and legacy content (explicit flags → filtered).
+- [x] **ADR-011** added to `decisions.md` documenting the channel/audience model and its rationale.
+- [x] `HomeCompositionService.isVisible()` javadoc updated to explain the production vs. legacy
+      content contract.
+
+Effort: 0.5 day (documentation + ADR).
 
 ---
 

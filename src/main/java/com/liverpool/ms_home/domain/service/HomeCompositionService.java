@@ -63,7 +63,17 @@ public class HomeCompositionService {
     }
 
     /**
-     * A block is visible when its audience matches the session and it is enabled for the channel.
+     * Returns true when the block is visible to the given session.
+     *
+     * <p><strong>Production behaviour (ADR-011):</strong> the live home template omits
+     * {@code audience_filter}, {@code enable_on_web}, and {@code enable_on_apps} from all blocks.
+     * {@code ContentServiceClient} defaults absent fields to {@code audienceFilter=null → ALL} and
+     * {@code enabledOnWeb/Apps=true}, so this method always returns {@code true} for production content.
+     * Channel routing is template-based: the caller supplies a different {@code path} per channel.
+     *
+     * <p><strong>Legacy content:</strong> the three-section schema ({@code top_layout / layout /
+     * bottom_layout}) carries explicit flags. This guard filters that content correctly without any
+     * code branching — both content classes are handled by the same logic.
      */
     private boolean isVisible(BlockDefinition raw, SessionContext session) {
         AudienceFilter audience = AudienceFilter.from(raw.audienceFilter());
