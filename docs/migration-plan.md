@@ -23,6 +23,12 @@
 
 ## Current status — snapshot 2026-06-20
 
+> **Gap analysis vs. live BFF** — see [docs/gap-analysis.md](gap-analysis.md) for full findings
+> from comparing ms-home against `GET /web-bff/content/page/es-mx/tienda/home`.  
+> **Critical P0 blocker identified:** `ContentServiceClient` parses `template.top_layout + layout + bottom_layout`
+> but production Contentstack home template uses `template.blocks[]` directly → zero blocks rendered.
+> Phase 10 is the next gate.
+
 | Phase | State | Notes |
 |---|---|---|
 | 0 — Foundation | ✅ Complete | pom + yaml + 4 profiles compile cleanly. |
@@ -34,7 +40,14 @@
 | 6 — Representative blocks | ✅ Complete | Static banner: already handled by existing pipeline (no extra code). Dynamic products_list: SalesforceProperties, SalesforceConfig, real ProductsListAdapter (POST /api2/authevent/liverpool), x-user-id header relay, ProductsListQuery.userId added. Compiles clean (62 files). |
 | 7 — Cross-cutting hardening | ✅ Complete | MdcRequestContextFilter (requestId/correlationId/service/operation MDC fields, runs before Spring Security); management port isolated to MANAGEMENT_PORT:8081; SecurityConfig denies /actuator/** on main port; path param @Size(max=256); requestId echo now reads from MDC (no duplication). Compiles clean (63 files). |
 | 8 — Docs | ✅ Complete | architecture.md, decisions.md (10 ADRs), integrations.md, deployment.md, changelog.md, error-handling.md all written. |
-| 9 — Tests & verify | ✅ Complete | 56 tests across 7 test classes, 0 failures. `./mvnw clean verify` → BUILD SUCCESS. Key fixes: `@Qualifier("contentServiceRestClient")` on `ContentServiceClient`, `ConstraintViolationException` handler added to `GlobalExceptionHandler`, Spring Boot 4.1 package `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`, `lenient()` stubbing for L1-hit Redis test. |
+| 9 — Tests & verify | ✅ Complete | 56 tests / 0 failures. |
+| **10 — Fix CMS schema (P0)** | ⬜ Next | `template.blocks[]` vs `top_layout+layout+bottom_layout`; default channel flags; add 6 real BlockTypes. |
+| 11 — Block content contracts | ⬜ | Per-type field mapping for all 6 production types. |
+| 12 — SEO / page metadata | ⬜ | Add `pageTitle`, `url`, `seo{}` to `HomePageResponse`. |
+| 13 — Channel/audience validation | ⬜ | Confirm CMS filtering mechanism with content team. |
+| 14 — GlobalData endpoint | ⬜ | Feature flags, public_variables, themes. |
+| 15 — Salesforce e2e | ⬜ | Find Salesforce block in CMS; validate full dynamic flow. |
+| 16 — Header/footer strategy | ⬜ | Bundle vs. dedicated endpoint decision + implementation. | 56 tests across 7 test classes, 0 failures. `./mvnw clean verify` → BUILD SUCCESS. Key fixes: `@Qualifier("contentServiceRestClient")` on `ContentServiceClient`, `ConstraintViolationException` handler added to `GlobalExceptionHandler`, Spring Boot 4.1 package `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`, `lenient()` stubbing for L1-hit Redis test. |
 
 **Files written so far (Phases 0–3):**
 - Config: `config/{ContentstackProperties,ResilienceProperties,Resilience4jConfig,OutboundLoggingInterceptor,RestClientConfig,SecurityConfig,HomeProperties,CacheConfig}.java`
