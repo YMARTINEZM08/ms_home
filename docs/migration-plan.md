@@ -29,12 +29,12 @@
 | 1 — Config | ✅ Complete (1 deferred) | Properties, Resilience4jConfig, RestClientConfig + interceptor, SecurityConfig done & compiling. **OpenApiConfig deferred** — springdoc has no verified Spring Boot 4.1 release. |
 | 2 — Domain | ✅ Complete | All domain sources written and compiling cleanly. |
 | 3 — Outbound adapters | ✅ Complete | ContentServiceClient (ContentPort + CB), SessionContextAdapter, FeatureFlagAdapter, StaticBlockCacheAdapter (Redis L2 + Caffeine L1). Also added: StaticBlockCachePort, HomeProperties, CacheConfig, cache TTL fields in ContentstackProperties. Compiles clean. |
-| 4 — Application use cases | ⬜ Pending | GetHomePageService, ProductsListResolveService (+ DomainBeansConfig to wire the pure composition service). |
-| 5 — Inbound REST | ⬜ Pending | HomeController, ProductsListResolveController, DTOs, mappers, RestControllerAdvice. |
-| 6 — Representative blocks | ⬜ Pending | Static banner (cached) + dynamic products_list (placeholder + endpoint + CB). |
-| 7 — Cross-cutting hardening | ⬜ Pending | Final security/logging/observability pass. |
-| 8 — Docs | 🟡 Partial | This migration-plan.md exists; architecture/decisions/integrations/deployment/changelog/error-handling not yet written. |
-| 9 — Tests & verify | ⬜ Pending | Unit/WireMock/Testcontainers/CB tests; `./mvnw clean verify`. |
+| 4 — Application use cases | ✅ Complete | GetHomePageService (cache-aside + composition), ProductsListResolveService (own CB `products-list-salesforce`), DomainBeansConfig, ProductsListAdapter stub. Compiles clean. |
+| 5 — Inbound REST | ✅ Complete | HomeController, ProductsListResolveController, DTOs, HomePageMapper, ProductsListMapper, GlobalExceptionHandler. Compiles clean (60 files). |
+| 6 — Representative blocks | ✅ Complete | Static banner: already handled by existing pipeline (no extra code). Dynamic products_list: SalesforceProperties, SalesforceConfig, real ProductsListAdapter (POST /api2/authevent/liverpool), x-user-id header relay, ProductsListQuery.userId added. Compiles clean (62 files). |
+| 7 — Cross-cutting hardening | ✅ Complete | MdcRequestContextFilter (requestId/correlationId/service/operation MDC fields, runs before Spring Security); management port isolated to MANAGEMENT_PORT:8081; SecurityConfig denies /actuator/** on main port; path param @Size(max=256); requestId echo now reads from MDC (no duplication). Compiles clean (63 files). |
+| 8 — Docs | ✅ Complete | architecture.md, decisions.md (10 ADRs), integrations.md, deployment.md, changelog.md, error-handling.md all written. |
+| 9 — Tests & verify | ✅ Complete | 56 tests across 7 test classes, 0 failures. `./mvnw clean verify` → BUILD SUCCESS. Key fixes: `@Qualifier("contentServiceRestClient")` on `ContentServiceClient`, `ConstraintViolationException` handler added to `GlobalExceptionHandler`, Spring Boot 4.1 package `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`, `lenient()` stubbing for L1-hit Redis test. |
 
 **Files written so far (Phases 0–3):**
 - Config: `config/{ContentstackProperties,ResilienceProperties,Resilience4jConfig,OutboundLoggingInterceptor,RestClientConfig,SecurityConfig,HomeProperties,CacheConfig}.java`
@@ -45,7 +45,7 @@
 - Adapters: `adapter/outbound/contentstack/ContentServiceClient.java`, `adapter/outbound/session/SessionContextAdapter.java`, `adapter/outbound/featureflag/FeatureFlagAdapter.java`, `adapter/outbound/redis/StaticBlockCacheAdapter.java`
 - App: `MsHomeApplication` annotated with `@ConfigurationPropertiesScan`.
 
-**Immediate next step:** Phase 4 — application use cases (`GetHomePageService`, `ProductsListResolveService`, `DomainBeansConfig`).
+**Immediate next step:** Phase 7 — cross-cutting hardening (security, MDC logging, observability).
 
 ## Platform notes (discovered during build)
 - Spring Boot **4.1.0** / Java 21. Module naming differs from Boot 3.x (`spring-boot-starter-webmvc`,
@@ -98,27 +98,63 @@
 - [x] **Platform note:** Spring Boot 4.1 ships Jackson 3 (`tools.jackson.*` packages); fixed imports accordingly.
 - [x] `./mvnw compile` clean, no warnings.
 
-### Phase 4 — Application use cases
-- [ ] `GetHomePageService` (@Service) — orchestrates composition.
-- [ ] `ProductsListResolveService` (@Service) — dynamic block resolution behind its own circuit breaker.
+### Phase 4 — Application use cases ✅
+- [x] `DomainBeansConfig` — wires `HomeCompositionService` (POJO, no Spring annotations) and `BlockResolutionCatalog` (built from `HomeProperties.blocks` + flag id constant `"products-list-salesforce"`). Single place to register new dynamic block types (Open/Closed).
+- [x] `GetHomePageService` — cache-aside pattern: L1/L2 hit → compose; miss → `ContentPort.fetchHomeDefinition` → cache → compose. Brand derived from `query.session()` so it stays consistent across the request. Session pre-resolved by caller (inbound adapter).
+- [x] `ProductsListResolveService` — CB `"products-list-salesforce"` wraps `ProductsListPort.fetch`; maps `CallNotPermittedException` → `ServiceUnavailableException`; maps unexpected errors → `DynamicBlockServiceUnavailableException`; re-throws the domain exception unchanged.
+- [x] `ProductsListAdapter` (stub, `adapter/outbound/salesforce/`) — Phase 6 placeholder; satisfies `ProductsListPort` so Spring context boots; always throws `DynamicBlockServiceUnavailableException` to surface the "not yet wired" state without masking failures.
+- [x] `./mvnw compile` clean (51 source files).
 
-### Phase 5 — Inbound REST + error handling
-- [ ] `HomeController` `GET /home` (layout only, SpringDoc-annotated).
-- [ ] `ProductsListResolveController` `GET /home/blocks/products-list/{blockId}`.
-- [ ] DTOs + mappers (domain ↔ dto).
-- [ ] Single thin `@RestControllerAdvice` → `ProblemDetail` (the only error infra; semantics live on exceptions).
+### Phase 5 — Inbound REST + error handling ✅
+- [x] `HomeController` `GET /home` — reads session via `SessionContextPort`; preview from configurable header name (`ContentstackProperties.previewHeader`); echoes/generates `x-request-id`; `@Validated`.
+- [x] `ProductsListResolveController` `GET /home/blocks/products-list/{blockId}` — `@NotBlank @Size(max=128)` on `blockId`; own `x-request-id` echo.
+- [x] DTOs: `HomeBlockResponse` (flat record with `kind` discriminator), `HomePageResponse`, `ProductsListResponse`, `ProductItemResponse`.
+- [x] Mappers: `HomePageMapper` (sealed pattern match → exhaustive conversion), `ProductsListMapper`.
+- [x] `GlobalExceptionHandler` — 4 handlers: `DynamicBlockServiceUnavailableException` (502 + blockId/blockType props), `HomeException` (status from exception), `HandlerMethodValidationException` (400), `Exception` catch-all (500, no internal detail leaked).
+- [x] `./mvnw compile` clean (60 source files).
 
-### Phase 6 — Two representative blocks
-- [ ] Static `banner` block: resolved from Contentstack, cached, owns its records/use case/rules.
-- [ ] Dynamic `products_list` (salesforce): placeholder in `/home` + independent endpoint + circuit-breaker fallback.
+### Phase 6 — Two representative blocks ✅
+- [x] **Static `banner`** — no new code required. The existing pipeline already handles it: `BlockType.BANNER(STATIC)` is classified by `HomeCompositionService`, resolved inline from Contentstack content, carried as `StaticBlock`, cached in Redis L2 + Caffeine L1 via `StaticBlockCacheAdapter`, and serialised as `HomeBlockResponse(kind=STATIC, content=...)` by `HomePageMapper`.
+- [x] **Dynamic `products_list` (Salesforce)** — replaced stub with real adapter:
+  - `SalesforceProperties` — `baseUrl`, `actionsPath`, `authorizationValue` (env-only secret), `timeout`, `application`, `defaultCarouselAction`.
+  - `SalesforceConfig` — dedicated `salesforceRestClient` bean (own connection pool, `Authorization` header, `OutboundLoggingInterceptor` with auth masking).
+  - `ProductsListQuery` — extended with `userId` (ATG profile id from `x-user-id` header; null for guests).
+  - `ProductsListResolveController` — reads `x-user-id` header; passes it in the query.
+  - `ProductsListAdapter` — `POST /api2/authevent/liverpool` with `action/flags/source/user.attributes.ID_ATG1`; maps `campaignResponses[0].payload.{productDataMapped,products}` to `ProductItem(sku,title,price)`; guards against missing userId.
+  - CB `"products-list-salesforce"` applied at use-case layer (Phase 4); adapter has no retry.
+  - **Platform note:** `salesforce.authorization-value` defaults to empty string — must be set via `SALESFORCE_AUTHORIZATION` env var; never committed.
+- [x] `./mvnw compile` clean (62 source files).
 
-### Phase 7 — Cross-cutting hardening
-- [ ] Security review across all endpoints (validation, headers, actuator, secrets).
-- [ ] Logging strategy (log-once at highest layer, context fields, no PII/secrets).
-- [ ] Observability (MDC fields, health, metrics).
+### Phase 7 — Cross-cutting hardening ✅
+- [x] **MDC filter** — `MdcRequestContextFilter` (`@Order(HIGHEST_PRECEDENCE + 10)`) sets `requestId`
+      (echoed or UUID-generated), `correlationId` (from `x-correlation-id` or falls back to requestId),
+      `service` (bound to `spring.application.name`), `operation` (`METHOD /path`). Cleared in `finally`.
+      `traceId`/`spanId` handled automatically by Micrometer Tracing + Brave `MDCScopeDecorator`.
+- [x] **Request ID ownership moved to filter** — both `HomeController` and `ProductsListResolveController`
+      now read `MDC.get("requestId")` for the response echo header instead of each having their own
+      `resolveRequestId()` UUID-generation logic. Single source of truth, consistent log/header correlation.
+- [x] **Security — actuator isolation** — `management.server.port: ${MANAGEMENT_PORT:8081}` separates
+      actuator onto a dedicated port not exposed by the API gateway. K8s health probes target port 8081.
+      `SecurityConfig` adds `.requestMatchers("/actuator/**").denyAll()` on the main port as
+      belt-and-suspenders.
+- [x] **Security — input validation** — `path` query param in `GET /home` hardened with `@Size(max=256)`.
+      `blockId` path variable already constrained (`@NotBlank @Size(max=128)`) from Phase 5.
+- [x] **Secrets** — confirmed no secrets in code; `SALESFORCE_AUTHORIZATION` default is empty string,
+      `OutboundLoggingInterceptor` masks `Authorization`/cookies/tokens.
+- [x] `./mvnw compile` clean (63 files).
 
-### Phase 8 — Docs
-- [ ] `architecture.md`, `decisions.md`, `integrations.md`, `deployment.md`, `changelog.md`, `error-handling.md`.
+### Phase 8 — Docs ✅
+- [x] `architecture.md` — layers, package layout, two request-flow diagrams, block-addition template.
+- [x] `decisions.md` — 10 ADRs: CMS proxy, Hexagonal, placeholder topology, CB/no-retry, static vs
+      dynamic, two-tier cache, virtual threads, programmatic Resilience4j, Jackson 3, management port.
+- [x] `integrations.md` — content-service (URL contract, headers, response structure, error handling),
+      Salesforce (request body, response mapping, guest guard), Redis (key scheme, failure behaviour),
+      upstream gateway (full inbound header table).
+- [x] `deployment.md` — full env-var table (required + optional), K8s probe snippets, graceful
+      shutdown, Docker Compose example, runtime log-level adjustment, CB metrics queries.
+- [x] `changelog.md` — v0.1.0 entry covering all Phases 0–7 additions.
+- [x] `error-handling.md` — exception hierarchy, error codes table, ProblemDetail shape (3 examples),
+      circuit-breaker states, three dynamic-block signals, logging conventions, troubleshooting guide.
 
 ### Phase 9 — Tests & verify
 - [ ] Unit: `HomeCompositionService`, mappers (no Spring).

@@ -25,8 +25,12 @@ logging:
     root: INFO
     com.liverpool.ms_home: ${LOG_LEVEL_APP:INFO}
 
-# Rule 9 — observability. Health probes + restricted actuator surface (security).
+# Rule 9 — observability. Actuator on a dedicated management port (default 8081) so it is never
+# reachable via the API gateway. K8s liveness/readiness probes target this port directly.
+# The main application port (8080) is the only gateway-exposed surface.
 management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:
@@ -43,8 +47,9 @@ management:
       enabled: true
 
 # Rule 6 — content-service (Contentstack proxy) integration contract. No secrets in code.
+# Local default 8082 avoids collision with the management port (8081).
 content-service:
-  base-url: ${CONTENT_SERVICE_BASE_URL:http://localhost:8081}
+  base-url: ${CONTENT_SERVICE_BASE_URL:http://localhost:8082}
   default-brand: ${CONTENT_SERVICE_BRAND:LP}
   preview-header: x-preview
   connect-timeout: ${CONTENT_SERVICE_CONNECT_TIMEOUT:2s}
@@ -75,3 +80,13 @@ home:
 springdoc:
   swagger-ui:
     enabled: ${SWAGGER_ENABLED:true}
+
+# Salesforce Evergage recommendation engine (Rule 19 reference: BFF SHARED_SALESFORCE_* env vars).
+# authorizationValue must always be supplied via SALESFORCE_AUTHORIZATION env var — never committed.
+salesforce:
+  base-url: ${SALESFORCE_BASE_URL:https://serviciosliverpoolsadecv.us-4.evergage.com}
+  actions-path: ${SALESFORCE_ACTIONS_PATH:/api2/authevent/liverpool}
+  authorization-value: ${SALESFORCE_AUTHORIZATION:}
+  timeout: ${SALESFORCE_TIMEOUT:4s}
+  application: ${SALESFORCE_APPLICATION:Web}
+  default-carousel-action: ${SALESFORCE_DEFAULT_CAROUSEL_ACTION:CMSOfertasIncreibles}

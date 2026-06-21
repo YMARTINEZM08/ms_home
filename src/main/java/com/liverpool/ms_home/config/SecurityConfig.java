@@ -12,8 +12,11 @@ import org.springframework.security.web.SecurityFilterChain;
  * <p>Authentication is performed upstream (API gateway / auth service); ms-home derives only the
  * login/guest <em>context</em> from the already-validated token and never trusts a client-asserted
  * identity. This chain therefore focuses on what this service owns: no server session, CSRF disabled
- * (no browser form/session state), and hardened response headers. Endpoint exposure is further
- * narrowed per profile (prod drops actuator loggers/metrics; Swagger is non-prod only).</p>
+ * (no browser form/session state), and hardened response headers.</p>
+ *
+ * <p>Actuator endpoints are served on a dedicated management port ({@code MANAGEMENT_PORT}, default
+ * 8081) and are therefore unreachable via the API gateway. The {@code /actuator/**} deny rule below
+ * is a belt-and-suspenders guard for environments where management and application ports coincide.</p>
  */
 @Configuration
 public class SecurityConfig {
@@ -30,7 +33,9 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/**").denyAll()
+                        .anyRequest().permitAll())
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.deny())
                         .contentTypeOptions(opts -> {
