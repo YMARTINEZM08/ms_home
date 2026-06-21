@@ -16,6 +16,8 @@ public class GlobalDataMapper {
                 data.locale(),
                 data.featureFlags(),
                 data.publicVariables(),
-                data.themes());
+                data.themes(),
+                data.header(),
+                data.footer());
     }
 }

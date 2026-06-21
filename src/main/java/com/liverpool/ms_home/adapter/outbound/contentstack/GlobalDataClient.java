@@ -38,7 +38,8 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
  *
  * <h3>Response mapping:</h3>
  * <p>The top-level JSON object is expected to carry {@code feature_flags}, {@code public_variables},
- * and {@code themes} as nested maps. Absent keys default to empty maps.</p>
+ * {@code themes}, {@code header}, and {@code footer} as nested maps. Absent keys default to
+ * empty maps.</p>
  */
 @Component
 public class GlobalDataClient implements GlobalDataPort {
@@ -52,6 +53,8 @@ public class GlobalDataClient implements GlobalDataPort {
     private static final String KEY_FEATURE_FLAGS    = "feature_flags";
     private static final String KEY_PUBLIC_VARIABLES = "public_variables";
     private static final String KEY_THEMES           = "themes";
+    private static final String KEY_HEADER           = "header";
+    private static final String KEY_FOOTER           = "footer";
 
     private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
             new ParameterizedTypeReference<>() {};
@@ -141,7 +144,9 @@ public class GlobalDataClient implements GlobalDataPort {
                 query.locale(),
                 extractMap(response, KEY_FEATURE_FLAGS),
                 extractMap(response, KEY_PUBLIC_VARIABLES),
-                extractMap(response, KEY_THEMES));
+                extractMap(response, KEY_THEMES),
+                extractMap(response, KEY_HEADER),
+                extractMap(response, KEY_FOOTER));
     }
 
     private String buildUri(GlobalDataQuery query) {

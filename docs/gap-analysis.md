@@ -395,14 +395,21 @@ Effort: ~0.5 day (blocked until a CMS page with `products_list` blocks is identi
 
 ---
 
-### Phase 16 — Header / footer serving strategy
-**Scope:** Decide and implement how the frontend gets header/footer.
+### Phase 16 — Header / footer serving strategy ✅ COMPLETE
 
-- [ ] Option A: Bundle in `/home` response (matches BFF behavior).
-- [ ] Option B: Dedicated `GET /navigation` endpoint cached long-term.
-- [ ] Whichever is chosen: add `header{}` and `footer{}` to the appropriate response.
+**Decision (ADR-012):** Extend `GET /global-data` — header and footer are session-independent,
+site-wide data with the same 15-minute TTL and circuit-breaker budget as the rest of GlobalData.
 
-Effort: ~0.5–1 day.
+**Implemented:**
+- `GlobalData` record extended with `header: Map<String,Object>` and `footer: Map<String,Object>` (6-param)
+- `GlobalDataClient.doFetch()` extracts `header` and `footer` via `extractMap()` (keys `"header"`, `"footer"`)
+- `GlobalDataResponse` DTO and `GlobalDataMapper.toResponse()` pass through both fields
+- **2 new tests** in `GlobalDataClientTest`: `fetchGlobalData_headerAndFooter_extractedFromCmsResponse`
+  (verifies extraction) + updated `fetchGlobalData_absentCmsKeys_returnsEmptyMaps` (header/footer assert)
+- **2 new tests** in `GlobalDataControllerTest`: `getGlobalData_headerAndFooterPresent_returnedInResponse`
+  + updated `getGlobalData_emptyMaps_returns200WithEmptyObjects` (header/footer empty map assertions)
+
+**Result:** 126 tests, 0 failures, BUILD SUCCESS.
 
 ---
 

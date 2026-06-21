@@ -47,7 +47,7 @@
 | **13 — Channel/audience validation** | ✅ Complete | Template-based routing confirmed from BFF gap analysis. All production home blocks omit filter fields → defaults are permissive. `container_guest` is frontend-rendered. ADR-011 added. No code changes. |
 | **14 — GlobalData endpoint** | ✅ Complete | `GET /global-data` — separate endpoint, Caffeine L1 cache, own `"global-data"` CB. `GlobalData` domain record, `GetGlobalDataService`, `GlobalDataClient`, `GlobalDataController`. 101 tests / 0 failures. |
 | **15 — Salesforce adapter validation** | ✅/⬜ | Unit/contract: `ProductsListAdapterTest` (13) + `ProductsListResolveControllerTest` (10). Live e2e: blocked — no CMS page with `products_list` blocks identified. Runbook in gap-analysis. 124 tests / 0 failures. |
-| 16 — Header/footer strategy | ⬜ | Bundle vs. dedicated endpoint decision + implementation. | 56 tests across 7 test classes, 0 failures. `./mvnw clean verify` → BUILD SUCCESS. Key fixes: `@Qualifier("contentServiceRestClient")` on `ContentServiceClient`, `ConstraintViolationException` handler added to `GlobalExceptionHandler`, Spring Boot 4.1 package `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`, `lenient()` stubbing for L1-hit Redis test. |
+| **16 — Header/footer strategy** | ✅ Complete | ADR-012: extend `GET /global-data`. `GlobalData` record + `GlobalDataClient` + `GlobalDataResponse` + `GlobalDataMapper` extended with `header` / `footer` fields. 2 new tests in `GlobalDataClientTest`, 2 in `GlobalDataControllerTest`. **126 tests / 0 failures**. |
 
 **Files written so far (Phases 0–3):**
 - Config: `config/{ContentstackProperties,ResilienceProperties,Resilience4jConfig,OutboundLoggingInterceptor,RestClientConfig,SecurityConfig,HomeProperties,CacheConfig}.java`

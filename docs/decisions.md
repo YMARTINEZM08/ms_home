@@ -241,3 +241,31 @@ the main port as a belt-and-suspenders guard.
   `http://localhost:8081/actuator/health/readiness`.
 - In local development: actuator is on port 8081 and the content-service default URL has been
   moved to port 8082 to avoid a localhost collision.
+
+---
+
+## ADR-012 — Header / footer served via `GET /global-data`, not a separate endpoint
+
+**Status:** Active  
+**Context:** The frontend needs the global navigation header and footer on every page. Three options
+were evaluated:
+1. Bundle `header` and `footer` in the `GET /home` response.
+2. Serve from a dedicated `GET /navigation` endpoint with its own cache.
+3. Extend the existing `GET /global-data` endpoint to include `header` and `footer`.
+
+**Decision:** Option 3 — extend `GET /global-data`. Header and footer are session-independent,
+site-wide data with the same 15-minute TTL semantics as feature flags, public variables, and themes.
+Adding two more map fields to the existing `GlobalData` record keeps the fetch-and-cache path
+unified: one CMS entry, one circuit breaker (`global-data`), one Caffeine L1 cache.
+
+**Consequences:**
+- `GlobalData` domain record gains `header: Map<String,Object>` and `footer: Map<String,Object>`.
+- `GlobalDataClient` extracts `header` and `footer` using the same `extractMap()` helper as the
+  other fields; absent keys default to `Map.of()` (never null).
+- `GlobalDataResponse` DTO and `GlobalDataMapper` are extended in kind — no new classes.
+- The frontend receives header/footer on the same call it already makes for feature flags, avoiding
+  a second round-trip.
+- Option 1 was rejected: bundling nav in `/home` couples navigation cache to home-page content TTL
+  and forces every home-page request to carry nav payload even when nav hasn't changed.
+- Option 2 was rejected: a separate `/navigation` endpoint is justified only if nav has a different
+  TTL, circuit-breaker budget, or cache strategy — none of which apply here.

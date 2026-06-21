@@ -103,6 +103,31 @@ class GlobalDataClientTest {
         assertThat(result.featureFlags()).isEmpty();
         assertThat(result.publicVariables()).isEmpty();
         assertThat(result.themes()).isEmpty();
+        assertThat(result.header()).isEmpty();
+        assertThat(result.footer()).isEmpty();
+    }
+
+    @Test
+    void fetchGlobalData_headerAndFooter_extractedFromCmsResponse() {
+        mockServer.expect(requestTo(EXPECTED_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {
+                          "feature_flags": {},
+                          "public_variables": {},
+                          "themes": {},
+                          "header": { "logo_url": "https://cdn.liverpool.com.mx/logo.svg", "nav_items": [] },
+                          "footer": { "copyright": "© Liverpool 2025", "links": [] }
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        GlobalData result = client.fetchGlobalData(QUERY);
+
+        assertThat(result.header()).containsEntry("logo_url", "https://cdn.liverpool.com.mx/logo.svg");
+        assertThat(result.header()).containsKey("nav_items");
+        assertThat(result.footer()).containsEntry("copyright", "© Liverpool 2025");
+        assertThat(result.footer()).containsKey("links");
+        mockServer.verify();
     }
 
     @Test

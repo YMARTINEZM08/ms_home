@@ -64,13 +64,17 @@ class GlobalDataControllerTest {
             "es-mx",
             Map.of("salesforce", true),
             Map.of("site_domain", "https://www.liverpool.com.mx"),
-            Map.of("primary_color", "#E31837"));
+            Map.of("primary_color", "#E31837"),
+            Map.of("logo_url", "https://cdn.liverpool.com.mx/logo.svg"),
+            Map.of("copyright", "© Liverpool 2025"));
 
     private static final GlobalDataResponse RESPONSE_DTO = new GlobalDataResponse(
             "es-mx",
             Map.of("salesforce", true),
             Map.of("site_domain", "https://www.liverpool.com.mx"),
-            Map.of("primary_color", "#E31837"));
+            Map.of("primary_color", "#E31837"),
+            Map.of("logo_url", "https://cdn.liverpool.com.mx/logo.svg"),
+            Map.of("copyright", "© Liverpool 2025"));
 
     @BeforeEach
     void setUp() {
@@ -91,13 +95,15 @@ class GlobalDataControllerTest {
                 .andExpect(jsonPath("$.locale").value("es-mx"))
                 .andExpect(jsonPath("$.featureFlags.salesforce").value(true))
                 .andExpect(jsonPath("$.publicVariables.site_domain").value("https://www.liverpool.com.mx"))
-                .andExpect(jsonPath("$.themes.primary_color").value("#E31837"));
+                .andExpect(jsonPath("$.themes.primary_color").value("#E31837"))
+                .andExpect(jsonPath("$.header").isMap())
+                .andExpect(jsonPath("$.footer").isMap());
     }
 
     @Test
     void getGlobalData_emptyMaps_returns200WithEmptyObjects() throws Exception {
-        GlobalData empty = new GlobalData("es-mx", null, null, null);
-        GlobalDataResponse emptyDto = new GlobalDataResponse("es-mx", Map.of(), Map.of(), Map.of());
+        GlobalData empty = new GlobalData("es-mx", null, null, null, null, null);
+        GlobalDataResponse emptyDto = new GlobalDataResponse("es-mx", Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
         when(getGlobalDataUseCase.getGlobalData(any())).thenReturn(empty);
         when(globalDataMapper.toResponse(empty)).thenReturn(emptyDto);
 
@@ -106,7 +112,20 @@ class GlobalDataControllerTest {
                 .andExpect(jsonPath("$.locale").value("es-mx"))
                 .andExpect(jsonPath("$.featureFlags").isMap())
                 .andExpect(jsonPath("$.publicVariables").isMap())
-                .andExpect(jsonPath("$.themes").isMap());
+                .andExpect(jsonPath("$.themes").isMap())
+                .andExpect(jsonPath("$.header").isMap())
+                .andExpect(jsonPath("$.footer").isMap());
+    }
+
+    @Test
+    void getGlobalData_headerAndFooterPresent_returnedInResponse() throws Exception {
+        when(getGlobalDataUseCase.getGlobalData(any())).thenReturn(DOMAIN_DATA);
+        when(globalDataMapper.toResponse(DOMAIN_DATA)).thenReturn(RESPONSE_DTO);
+
+        mockMvc.perform(get("/global-data").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.header.logo_url").value("https://cdn.liverpool.com.mx/logo.svg"))
+                .andExpect(jsonPath("$.footer.copyright").value("© Liverpool 2025"));
     }
 
     @Test
