@@ -47,7 +47,7 @@ class StaticBlockCacheAdapterTest {
 
     private static final ContentQuery QUERY = new ContentQuery("LP", "es-mx", "home", false);
     private static final String CACHE_KEY = "home:def:LP:es-mx:home:false";
-    private static final HomeDefinition DEFINITION = new HomeDefinition("page", "es-mx", List.of());
+    private static final HomeDefinition DEFINITION = new HomeDefinition("page", "es-mx", null, null, List.of());
 
     @BeforeEach
     void setUp() {
@@ -145,8 +145,8 @@ class StaticBlockCacheAdapterTest {
         ContentQuery nonPreview = new ContentQuery("LP", "es-mx", "home", false);
         ContentQuery preview    = new ContentQuery("LP", "es-mx", "home", true);
 
-        HomeDefinition live    = new HomeDefinition("page", "es-mx", List.of());
-        HomeDefinition previewDef = new HomeDefinition("page", "es-mx", List.of());
+        HomeDefinition live       = new HomeDefinition("page", "es-mx", null, null, List.of());
+        HomeDefinition previewDef = new HomeDefinition("page", "es-mx", null, null, List.of());
 
         String liveKey    = "home:def:LP:es-mx:home:false";
         String previewKey = "home:def:LP:es-mx:home:true";

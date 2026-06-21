@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,9 +45,9 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
  * carries the preview header.</p>
  *
  * <h3>Response structure:</h3>
- * <pre>{ "template": { "layout": [...], "top_layout": [...], "bottom_layout": [...] } }</pre>
- * <p>Blocks from {@code top_layout}, {@code layout}, and {@code bottom_layout} are merged in that
- * order to preserve Contentstack ordering (Rule 18).</p>
+ * <p>Current production schema: {@code template.blocks[]} — flat ordered array.<br>
+ * Legacy schema: {@code template.top_layout + layout + bottom_layout} merged in that order.<br>
+ * The adapter reads {@code blocks} first; falls back to the three-section merge when absent.</p>
  */
 @Component
 public class ContentServiceClient implements ContentPort {
@@ -59,12 +58,19 @@ public class ContentServiceClient implements ContentPort {
     private static final String HEADER_BRAND_ID = "x-brand-id";
     private static final String PREVIEW_BRAND_SUFFIX = "-PREVIEW";
 
-    private static final String RESPONSE_KEY_TEMPLATE = "template";
+    private static final String RESPONSE_KEY_TEMPLATE  = "template";
+    private static final String RESPONSE_KEY_PAGE_TITLE = "page_title";
+    private static final String RESPONSE_KEY_SEO        = "seo";
+    // Current production schema: template.blocks[]
+    private static final String RESPONSE_KEY_BLOCKS = "blocks";
+    // Legacy schema: template.top_layout + layout + bottom_layout
     private static final String RESPONSE_KEY_LAYOUT = "layout";
     private static final String RESPONSE_KEY_TOP_LAYOUT = "top_layout";
     private static final String RESPONSE_KEY_BOTTOM_LAYOUT = "bottom_layout";
 
-    private static final String BLOCK_KEY_UID = "_uid";
+    // Production entries use "uid"; legacy layout entries used "_uid".
+    private static final String BLOCK_KEY_UID = "uid";
+    private static final String BLOCK_KEY_UID_LEGACY = "_uid";
     private static final String BLOCK_KEY_CONTENT_TYPE_UID = "_content_type_uid";
     private static final String BLOCK_KEY_AUDIENCE_FILTER = "audience_filter";
     private static final String BLOCK_KEY_ENABLE_ON_WEB = "enable_on_web";
@@ -152,21 +158,38 @@ public class ContentServiceClient implements ContentPort {
                     "Content-service returned an empty response.", buildDetail(query, "null body"), null);
         }
 
+        String pageTitle = (String) response.get(RESPONSE_KEY_PAGE_TITLE);
+        Map<String, Object> seo = extractNestedMap(response, RESPONSE_KEY_SEO);
+
         Map<String, Object> template = (Map<String, Object>) response.get(RESPONSE_KEY_TEMPLATE);
         if (template == null) {
             log.warn("content-service response missing 'template' key for query={}", query);
-            return new HomeDefinition(properties.homeContentType(), query.locale(), List.of());
+            return new HomeDefinition(properties.homeContentType(), query.locale(), pageTitle, seo, List.of());
         }
 
-        List<BlockDefinition> blocks = Stream.of(
-                        extractBlockList(template, RESPONSE_KEY_TOP_LAYOUT),
-                        extractBlockList(template, RESPONSE_KEY_LAYOUT),
-                        extractBlockList(template, RESPONSE_KEY_BOTTOM_LAYOUT))
-                .flatMap(List::stream)
+        List<BlockDefinition> blocks = resolveBlocks(template).stream()
                 .map(this::toBlockDefinition)
                 .toList();
 
-        return new HomeDefinition(properties.homeContentType(), query.locale(), blocks);
+        return new HomeDefinition(properties.homeContentType(), query.locale(), pageTitle, seo, blocks);
+    }
+
+    /**
+     * Reads the ordered block list from the template. Prefers the current {@code template.blocks[]}
+     * schema; falls back to merging {@code top_layout + layout + bottom_layout} for legacy entries.
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> resolveBlocks(Map<String, Object> template) {
+        List<Map<String, Object>> direct = extractBlockList(template, RESPONSE_KEY_BLOCKS);
+        if (!direct.isEmpty()) {
+            return direct;
+        }
+        // Legacy three-section schema.
+        List<Map<String, Object>> merged = new ArrayList<>();
+        merged.addAll(extractBlockList(template, RESPONSE_KEY_TOP_LAYOUT));
+        merged.addAll(extractBlockList(template, RESPONSE_KEY_LAYOUT));
+        merged.addAll(extractBlockList(template, RESPONSE_KEY_BOTTOM_LAYOUT));
+        return merged;
     }
 
     @SuppressWarnings("unchecked")
@@ -178,15 +201,30 @@ public class ContentServiceClient implements ContentPort {
         return Collections.emptyList();
     }
 
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> extractNestedMap(Map<String, Object> response, String key) {
+        Object value = response.get(key);
+        if (value instanceof Map<?, ?> m) {
+            return Map.copyOf((Map<String, Object>) m);
+        }
+        return Map.of();
+    }
+
     private BlockDefinition toBlockDefinition(Map<String, Object> raw) {
-        String uid = (String) raw.get(BLOCK_KEY_UID);
+        // Production entries use "uid"; legacy layout entries used "_uid".
+        String uid = raw.containsKey(BLOCK_KEY_UID)
+                ? (String) raw.get(BLOCK_KEY_UID)
+                : (String) raw.get(BLOCK_KEY_UID_LEGACY);
         String contentTypeUid = (String) raw.get(BLOCK_KEY_CONTENT_TYPE_UID);
         String audienceFilter = (String) raw.get(BLOCK_KEY_AUDIENCE_FILTER);
-        boolean enableOnWeb = Boolean.TRUE.equals(raw.get(BLOCK_KEY_ENABLE_ON_WEB));
-        boolean enableOnApps = Boolean.TRUE.equals(raw.get(BLOCK_KEY_ENABLE_ON_APPS));
+        // Default to enabled when the field is absent — production home blocks omit these fields,
+        // meaning channel control is implicit (separate CMS template per channel/path).
+        boolean enableOnWeb  = !raw.containsKey(BLOCK_KEY_ENABLE_ON_WEB)  || Boolean.TRUE.equals(raw.get(BLOCK_KEY_ENABLE_ON_WEB));
+        boolean enableOnApps = !raw.containsKey(BLOCK_KEY_ENABLE_ON_APPS) || Boolean.TRUE.equals(raw.get(BLOCK_KEY_ENABLE_ON_APPS));
 
         Map<String, Object> attributes = new HashMap<>(raw);
-        attributes.remove(BLOCK_KEY_UID);
+        attributes.remove(BLOCK_KEY_UID);        // production: "uid"
+        attributes.remove(BLOCK_KEY_UID_LEGACY); // legacy: "_uid"
         attributes.remove(BLOCK_KEY_CONTENT_TYPE_UID);
 
         return new BlockDefinition(uid, contentTypeUid, audienceFilter, enableOnWeb, enableOnApps,

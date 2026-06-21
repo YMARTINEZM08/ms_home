@@ -11,6 +11,24 @@ import java.util.Arrays;
  */
 public enum BlockType {
 
+    /** Full-width hero image/video carousel with optional CTA buttons. */
+    HERO_BANNER_SLIDER("hero_banner_slider", BlockKind.STATIC),
+
+    /** Generic layout container that wraps child blocks (cards, etc.) in a responsive grid. */
+    CONTAINER("container", BlockKind.STATIC),
+
+    /** Guest-only promotional widget shown only to unauthenticated users. */
+    CONTAINER_GUEST("container_guest", BlockKind.STATIC),
+
+    /** Horizontal category-strip with icon/label items linking to departments. */
+    BAND("band", BlockKind.STATIC),
+
+    /** Static card carousel (brand/category/editorial cards). */
+    CARD_SLIDER("card_slider", BlockKind.STATIC),
+
+    /** User-generated-content section embedding social media / hashtag feeds. */
+    USER_GENERATED_CONTENT("user_generated_content", BlockKind.STATIC),
+
     /** Static promotional banner; fully resolved from Contentstack and cacheable. */
     BANNER("banner", BlockKind.STATIC),
 

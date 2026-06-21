@@ -53,10 +53,64 @@ class ContentServiceClientTest {
         client = buildClient(defaultRegistry);
     }
 
-    // ── happy path ───────────────────────────────────────────────────────────────────────────────
+    // ── happy path — current production schema ────────────────────────────────────────────────────
 
     @Test
-    void fetchHomeDefinition_mergesTopLayoutAndLayout() {
+    void fetchHomeDefinition_templateDotBlocks_readDirectly() {
+        // Production schema: template.blocks[] with "uid" (not "_uid") and no channel flags.
+        String json = """
+                {
+                  "template": {
+                    "blocks": [
+                      { "uid":"b1","_content_type_uid":"hero_banner_slider" },
+                      { "uid":"b2","_content_type_uid":"container" },
+                      { "uid":"b3","_content_type_uid":"band" }
+                    ]
+                  }
+                }
+                """;
+        mockServer.expect(requestTo(EXPECTED_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("x-brand-id", "LP"))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+        HomeDefinition result = client.fetchHomeDefinition(QUERY);
+
+        assertThat(result.blocks()).hasSize(3);
+        assertThat(result.blocks()).extracting(b -> b.uid())
+                .containsExactly("b1", "b2", "b3");
+        assertThat(result.blocks()).extracting(b -> b.contentTypeUid())
+                .containsExactly("hero_banner_slider", "container", "band");
+        mockServer.verify();
+    }
+
+    @Test
+    void fetchHomeDefinition_absentChannelFlags_defaultToEnabled() {
+        // Production blocks omit enable_on_web / enable_on_apps — both must default to true.
+        String json = """
+                {
+                  "template": {
+                    "blocks": [
+                      { "uid":"b1","_content_type_uid":"hero_banner_slider" }
+                    ]
+                  }
+                }
+                """;
+        mockServer.expect(requestTo(EXPECTED_URL))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+        HomeDefinition result = client.fetchHomeDefinition(QUERY);
+
+        assertThat(result.blocks()).hasSize(1);
+        assertThat(result.blocks().get(0).enabledOnWeb()).isTrue();
+        assertThat(result.blocks().get(0).enabledOnApps()).isTrue();
+    }
+
+    // ── happy path — legacy schema ────────────────────────────────────────────────────────────────
+
+    @Test
+    void fetchHomeDefinition_legacySchema_mergesTopLayoutAndLayout() {
+        // Legacy schema: top_layout + layout + bottom_layout with "_uid" and explicit channel flags.
         String json = """
                 {
                   "template": {
@@ -77,6 +131,30 @@ class ContentServiceClientTest {
         assertThat(result.blocks()).extracting(b -> b.uid())
                 .containsExactly("t1", "l1", "b1");
         mockServer.verify();
+    }
+
+    @Test
+    void fetchHomeDefinition_templateDotBlocksTakesPrecedenceOverLegacySections() {
+        // When both schemas are present, template.blocks wins.
+        String json = """
+                {
+                  "template": {
+                    "blocks": [
+                      { "uid":"new","_content_type_uid":"hero_banner_slider" }
+                    ],
+                    "layout": [
+                      { "_uid":"old","_content_type_uid":"banner","enable_on_web":true,"enable_on_apps":true }
+                    ]
+                  }
+                }
+                """;
+        mockServer.expect(requestTo(EXPECTED_URL))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+        HomeDefinition result = client.fetchHomeDefinition(QUERY);
+
+        assertThat(result.blocks()).hasSize(1);
+        assertThat(result.blocks().get(0).uid()).isEqualTo("new");
     }
 
     @Test
@@ -101,6 +179,39 @@ class ContentServiceClientTest {
         client.fetchHomeDefinition(pathQuery);
 
         mockServer.verify();
+    }
+
+    @Test
+    void fetchHomeDefinition_extractsPageTitleAndSeo() {
+        String json = """
+                {
+                  "page_title": "Liverpool Online",
+                  "seo": {
+                    "meta_description": "Tienda en línea",
+                    "no_index": false
+                  },
+                  "template": { "blocks": [] }
+                }
+                """;
+        mockServer.expect(requestTo(EXPECTED_URL))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+
+        HomeDefinition result = client.fetchHomeDefinition(QUERY);
+
+        assertThat(result.pageTitle()).isEqualTo("Liverpool Online");
+        assertThat(result.seo()).containsEntry("meta_description", "Tienda en línea");
+        assertThat(result.seo()).containsEntry("no_index", false);
+    }
+
+    @Test
+    void fetchHomeDefinition_absentPageTitleAndSeo_defaultToNullAndEmpty() {
+        mockServer.expect(requestTo(EXPECTED_URL))
+                .andRespond(withSuccess("{\"template\":{\"blocks\":[]}}", MediaType.APPLICATION_JSON));
+
+        HomeDefinition result = client.fetchHomeDefinition(QUERY);
+
+        assertThat(result.pageTitle()).isNull();
+        assertThat(result.seo()).isEmpty();
     }
 
     @Test

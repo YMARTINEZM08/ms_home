@@ -1,6 +1,7 @@
 package com.liverpool.ms_home.adapter.inbound.rest.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,8 +77,8 @@ class HomeControllerTest {
     @Test
     void getHomePage_guestSession_returns200WithJsonBody() throws Exception {
         when(sessionContextPort.currentContext()).thenReturn(GUEST_SESSION);
-        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", List.of()));
-        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", List.of()));
+        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", null, null, List.of()));
+        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", null, Map.of(), List.of()));
 
         mockMvc.perform(get("/home").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -89,8 +90,8 @@ class HomeControllerTest {
     @Test
     void getHomePage_authenticatedSession_returns200() throws Exception {
         when(sessionContextPort.currentContext()).thenReturn(AUTH_SESSION);
-        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", List.of()));
-        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", List.of()));
+        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", null, null, List.of()));
+        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", null, Map.of(), List.of()));
 
         mockMvc.perform(get("/home").header("x-authenticated", "true"))
                 .andExpect(status().isOk());
@@ -99,8 +100,8 @@ class HomeControllerTest {
     @Test
     void getHomePage_inboundRequestId_echoedInResponseHeader() throws Exception {
         when(sessionContextPort.currentContext()).thenReturn(GUEST_SESSION);
-        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", List.of()));
-        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", List.of()));
+        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", null, null, List.of()));
+        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", null, Map.of(), List.of()));
 
         mockMvc.perform(get("/home").header("x-request-id", "test-req-id"))
                 .andExpect(status().isOk())
@@ -110,8 +111,8 @@ class HomeControllerTest {
     @Test
     void getHomePage_noRequestId_generatesUuidInResponseHeader() throws Exception {
         when(sessionContextPort.currentContext()).thenReturn(GUEST_SESSION);
-        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", List.of()));
-        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", List.of()));
+        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", null, null, List.of()));
+        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", null, Map.of(), List.of()));
 
         mockMvc.perform(get("/home"))
                 .andExpect(status().isOk())
@@ -121,12 +122,12 @@ class HomeControllerTest {
     @Test
     void getHomePage_responseContainsBlocks() throws Exception {
         when(sessionContextPort.currentContext()).thenReturn(GUEST_SESSION);
-        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", List.of()));
+        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", null, null, List.of()));
 
         HomeBlockResponse blockDto = new HomeBlockResponse(
                 "uid-1", "BANNER", "STATIC", null, null, null, null, null);
         when(homePageMapper.toResponse(any()))
-                .thenReturn(new HomePageResponse("es-mx", List.of(blockDto)));
+                .thenReturn(new HomePageResponse("es-mx", null, Map.of(), List.of(blockDto)));
 
         mockMvc.perform(get("/home"))
                 .andExpect(status().isOk())
@@ -203,8 +204,8 @@ class HomeControllerTest {
     @Test
     void getHomePage_previewHeaderPresent_useCaseReceivesPreviewTrue() throws Exception {
         when(sessionContextPort.currentContext()).thenReturn(GUEST_SESSION);
-        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", List.of()));
-        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", List.of()));
+        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", null, null, List.of()));
+        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", null, Map.of(), List.of()));
 
         mockMvc.perform(get("/home").header("x-preview", "true"))
                 .andExpect(status().isOk());
@@ -217,8 +218,8 @@ class HomeControllerTest {
     @Test
     void getHomePage_noPreviewHeader_useCaseReceivesPreviewFalse() throws Exception {
         when(sessionContextPort.currentContext()).thenReturn(GUEST_SESSION);
-        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", List.of()));
-        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", List.of()));
+        when(getHomePageUseCase.getHomePage(any())).thenReturn(new HomePage("es-mx", null, null, List.of()));
+        when(homePageMapper.toResponse(any())).thenReturn(new HomePageResponse("es-mx", null, Map.of(), List.of()));
 
         mockMvc.perform(get("/home"))
                 .andExpect(status().isOk());

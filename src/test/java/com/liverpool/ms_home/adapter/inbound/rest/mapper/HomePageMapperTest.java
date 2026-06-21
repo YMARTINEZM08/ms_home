@@ -30,7 +30,7 @@ class HomePageMapperTest {
     @Test
     void toResponse_staticBlock_kindIsStatic() {
         StaticBlock block = new StaticBlock("uid-1", BlockType.BANNER, Map.of("title", "Hello"));
-        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", List.of(block)));
+        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", null, null, List.of(block)));
 
         HomeBlockResponse dto = response.blocks().get(0);
         assertThat(dto.kind()).isEqualTo("STATIC");
@@ -42,7 +42,7 @@ class HomePageMapperTest {
     @Test
     void toResponse_staticBlock_dynamicFieldsAreNull() {
         StaticBlock block = new StaticBlock("uid-2", BlockType.BANNER, Map.of());
-        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", List.of(block)));
+        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", null, null, List.of(block)));
 
         HomeBlockResponse dto = response.blocks().get(0);
         assertThat(dto.resolutionPath()).isNull();
@@ -60,7 +60,7 @@ class HomePageMapperTest {
                 "/home/blocks/products-list", "fallback-payload",
                 "products-list-salesforce", DynamicBlockStatus.AVAILABLE);
 
-        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", List.of(ph)));
+        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", null, null, List.of(ph)));
 
         HomeBlockResponse dto = response.blocks().get(0);
         assertThat(dto.kind()).isEqualTo("DYNAMIC");
@@ -79,7 +79,7 @@ class HomePageMapperTest {
                 "/home/blocks/products-list", null,
                 "products-list-salesforce", DynamicBlockStatus.DISABLED);
 
-        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", List.of(ph)));
+        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", null, null, List.of(ph)));
 
         assertThat(response.blocks().get(0).content()).isNull();
     }
@@ -91,7 +91,7 @@ class HomePageMapperTest {
                 "/home/blocks/products-list", null,
                 "flag-id", DynamicBlockStatus.DISABLED);
 
-        HomeBlockResponse dto = mapper.toResponse(new HomePage("es-mx", List.of(ph))).blocks().get(0);
+        HomeBlockResponse dto = mapper.toResponse(new HomePage("es-mx", null, null, List.of(ph))).blocks().get(0);
 
         assertThat(dto.status()).isEqualTo("DISABLED");
     }
@@ -100,14 +100,14 @@ class HomePageMapperTest {
 
     @Test
     void toResponse_preservesLocale() {
-        HomePageResponse response = mapper.toResponse(new HomePage("pt-br", List.of()));
+        HomePageResponse response = mapper.toResponse(new HomePage("pt-br", null, null, List.of()));
 
         assertThat(response.locale()).isEqualTo("pt-br");
     }
 
     @Test
     void toResponse_emptyPage_returnsEmptyBlockList() {
-        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", List.of()));
+        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", null, null, List.of()));
 
         assertThat(response.blocks()).isEmpty();
     }
@@ -118,9 +118,27 @@ class HomePageMapperTest {
         StaticBlock second = new StaticBlock("second", BlockType.BANNER, Map.of());
         StaticBlock third  = new StaticBlock("third",  BlockType.BANNER, Map.of());
 
-        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", List.of(first, second, third)));
+        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", null, null, List.of(first, second, third)));
 
         assertThat(response.blocks()).extracting(HomeBlockResponse::blockId)
                 .containsExactly("first", "second", "third");
+    }
+
+    @Test
+    void toResponse_mapsPageTitleAndSeo() {
+        Map<String, Object> seo = Map.of("meta_description", "Tienda en línea", "no_index", false);
+        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", "Liverpool Online", seo, List.of()));
+
+        assertThat(response.pageTitle()).isEqualTo("Liverpool Online");
+        assertThat(response.seo()).containsEntry("meta_description", "Tienda en línea");
+        assertThat(response.seo()).containsEntry("no_index", false);
+    }
+
+    @Test
+    void toResponse_nullPageTitleAndSeo_passedThrough() {
+        HomePageResponse response = mapper.toResponse(new HomePage("es-mx", null, null, List.of()));
+
+        assertThat(response.pageTitle()).isNull();
+        assertThat(response.seo()).isEmpty();
     }
 }

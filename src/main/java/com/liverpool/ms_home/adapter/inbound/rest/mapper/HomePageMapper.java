@@ -34,7 +34,7 @@ public class HomePageMapper {
         List<HomeBlockResponse> blocks = page.blocks().stream()
                 .map(this::toBlockResponse)
                 .toList();
-        return new HomePageResponse(page.locale(), blocks);
+        return new HomePageResponse(page.locale(), page.pageTitle(), page.seo(), blocks);
     }
 
     /**

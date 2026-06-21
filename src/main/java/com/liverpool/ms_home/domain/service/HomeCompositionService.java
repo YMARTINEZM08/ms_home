@@ -59,7 +59,7 @@ public class HomeCompositionService {
             }
             blocks.add(toBlock(raw, session));
         }
-        return new HomePage(definition.locale(), blocks);
+        return new HomePage(definition.locale(), definition.pageTitle(), definition.seo(), blocks);
     }
 
     /**

@@ -6,6 +6,8 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -45,6 +47,35 @@ class HomeCompositionServiceTest {
         BlockResolutionCatalog catalog = new BlockResolutionCatalog(Map.of(
                 BlockType.PRODUCTS_LIST, new BlockResolution(ENDPOINT, FLAG_PRODUCTS_LIST)));
         service = new HomeCompositionService(featureFlagPort, catalog);
+    }
+
+    // ── production block pattern (no audienceFilter, no channel flags) ───────────────────────────
+
+    @Test
+    void compose_productionBlock_nullAudienceAndAbsentChannelFlags_isVisible() {
+        // Mirrors what ContentServiceClient.toBlockDefinition() produces for production blocks:
+        // audienceFilter=null (→ ALL), enabledOnWeb=true (default), enabledOnApps=true (default).
+        BlockDefinition block = new BlockDefinition("uid-1", "hero_banner_slider", null, true, true, Map.of());
+        HomeDefinition def = defWithBlocks(block);
+
+        assertThat(service.compose(def, GUEST_WEB).blocks()).hasSize(1);
+        assertThat(service.compose(def, AUTH_WEB).blocks()).hasSize(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "hero_banner_slider", "container", "container_guest",
+            "band", "card_slider", "user_generated_content"
+    })
+    void compose_productionBlockTypes_classifiedAsStatic(String contentTypeUid) {
+        BlockDefinition block = new BlockDefinition("uid", contentTypeUid, null, true, true, Map.of());
+        HomeDefinition def = defWithBlocks(block);
+
+        HomePage page = service.compose(def, GUEST_WEB);
+
+        assertThat(page.blocks()).hasSize(1);
+        assertThat(page.blocks().get(0)).isInstanceOf(StaticBlock.class);
+        assertThat(((StaticBlock) page.blocks().get(0)).blockType().kind()).isEqualTo(BlockKind.STATIC);
     }
 
     // ── static blocks ────────────────────────────────────────────────────────────────────────────
@@ -196,7 +227,7 @@ class HomeCompositionServiceTest {
 
     @Test
     void compose_setsLocaleFromDefinition() {
-        HomeDefinition def = new HomeDefinition("page", "pt-br", List.of());
+        HomeDefinition def = new HomeDefinition("page", "pt-br", null, null, List.of());
 
         HomePage page = service.compose(def, GUEST_WEB);
 
@@ -206,7 +237,7 @@ class HomeCompositionServiceTest {
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────
 
     private static HomeDefinition defWithBlocks(BlockDefinition... blocks) {
-        return new HomeDefinition("page", "es-mx", List.of(blocks));
+        return new HomeDefinition("page", "es-mx", null, null, List.of(blocks));
     }
 
     private static BlockDefinition banner(String uid, String audience, boolean web, boolean apps) {

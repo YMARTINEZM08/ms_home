@@ -41,9 +41,9 @@
 | 7 — Cross-cutting hardening | ✅ Complete | MdcRequestContextFilter (requestId/correlationId/service/operation MDC fields, runs before Spring Security); management port isolated to MANAGEMENT_PORT:8081; SecurityConfig denies /actuator/** on main port; path param @Size(max=256); requestId echo now reads from MDC (no duplication). Compiles clean (63 files). |
 | 8 — Docs | ✅ Complete | architecture.md, decisions.md (10 ADRs), integrations.md, deployment.md, changelog.md, error-handling.md all written. |
 | 9 — Tests & verify | ✅ Complete | 56 tests / 0 failures. |
-| **10 — Fix CMS schema (P0)** | ⬜ Next | `template.blocks[]` vs `top_layout+layout+bottom_layout`; default channel flags; add 6 real BlockTypes. |
+| **10 — Fix CMS schema (P0)** | ✅ Complete | `template.blocks[]` primary + legacy fallback; absent channel flags default to `true`; `uid`/`_uid` dual-read; 6 real BlockTypes added. 59 tests / 0 failures. |
 | 11 — Block content contracts | ⬜ | Per-type field mapping for all 6 production types. |
-| 12 — SEO / page metadata | ⬜ | Add `pageTitle`, `url`, `seo{}` to `HomePageResponse`. |
+| **12 — SEO / page metadata** | ✅ Complete | `pageTitle` + `seo{}` added to `HomeDefinition`, `HomePage`, `HomePageResponse`; extracted from top-level CMS response in `ContentServiceClient`. 70 tests / 0 failures. |
 | 13 — Channel/audience validation | ⬜ | Confirm CMS filtering mechanism with content team. |
 | 14 — GlobalData endpoint | ⬜ | Feature flags, public_variables, themes. |
 | 15 — Salesforce e2e | ⬜ | Find Salesforce block in CMS; validate full dynamic flow. |
