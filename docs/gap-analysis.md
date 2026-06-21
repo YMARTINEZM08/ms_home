@@ -327,16 +327,71 @@ Effort: ~1 day.
 
 ---
 
-### Phase 15 — Salesforce block end-to-end validation
-**Scope:** Validate the full dynamic products_list flow with a real page variant.
+### Phase 15 — Salesforce adapter validation ✅ (unit/contract) / ⬜ (live e2e)
+**Scope:** Validate the full dynamic `products_list` flow through contract tests; document the
+live e2e runbook for when a CMS page with Salesforce blocks is available.
 
-- [ ] Identify a Contentstack page entry that contains Salesforce blocks.
-- [ ] Confirm the `salesforce_experience_id` field exists on the block and maps to Evergage campaign.
-- [ ] Run end-to-end: `GET /home?path=<that-page>` → `GET /home/blocks/{blockId}`.
-- [ ] Validate circuit breaker behavior against real Salesforce sandbox.
-- [ ] Add integration test or contract test for the Salesforce adapter.
+**Completed (no live Salesforce access required):**
 
-Effort: ~1 day.
+- [x] **`ProductsListAdapterTest`** — 13 tests covering the full adapter surface:
+  - Guest guard: null / blank `userId` → immediate `DynamicBlockServiceUnavailableException`,
+    zero HTTP calls made.
+  - Request body: asserts `action`, `flags.noCampaigns`, `source.channel/application`,
+    `user.attributes.ID_ATG1` against the Salesforce contract (Rule 19 reference:
+    `ProductListSalesforcePopulateStrategy` in BFF).
+  - `productDataMapped` path: maps `productId → sku`, `title`, `priceInfo.listPrice.price → price`.
+  - Multi-product mapping and null `priceInfo` resilience.
+  - Raw `products` fallback: maps `id → sku`, `attributes.name.value → title`,
+    `attributes.listPrice.value → price`.
+  - `productDataMapped` takes precedence when both arrays are non-empty.
+  - Only the first `campaignResponses` element is consumed.
+  - Empty `campaignResponses` / absent key / null `payload` / empty product arrays → empty
+    resolution (no NPE).
+  - HTTP 500 from Salesforce → `DynamicBlockServiceUnavailableException` with correct
+    `blockId` and `blockType`.
+- [x] **`ProductsListResolveControllerTest`** — 10 tests covering the REST layer:
+  - 200 with product items in JSON response.
+  - Empty product list (200, not 204).
+  - `x-request-id` echo and UUID generation.
+  - `x-user-id` header forwarded as `query.userId()`.
+  - Absent `x-user-id` forwarded as null (guest session).
+  - `DynamicBlockServiceUnavailableException` → 502 with `blockId`, `blockType`, `retryable`.
+  - `ServiceUnavailableException` → 503 with `errorCode=SERVICE_UNAVAILABLE`.
+  - Unexpected error → 500, consumer message only (no internal detail leaked).
+  - `blockId` too long → 400 `VALIDATION_ERROR`.
+
+**Live e2e validation runbook (external gate — blocked):**
+
+The authenticated home page response (BFF comparison baseline) contains zero `products_list`
+blocks (`salesforce: true` in globalData but no blocks in the home template). The following
+steps are required once a suitable CMS page is identified:
+
+1. **Find a CMS template with `products_list` blocks** — check Contentstack for page entries that
+   contain blocks with `_content_type_uid: products_list`. Candidates: flash-sale pages, category
+   landing pages, personalised carousels.
+
+2. **Confirm field mapping** — verify that the CMS block carries a `salesforce_experience_id` field
+   (or equivalent) that maps to the Evergage campaign action. The BFF's
+   `ProductListSalesforcePopulateStrategy` maps `block.salesforce_experience_id → action` in the
+   Salesforce request; ms-home currently uses `SalesforceProperties.defaultCarouselAction` as a
+   fixed value. A per-block action field would require a `ProductsListQuery` extension.
+
+3. **Deploy with env vars set** — `SALESFORCE_AUTHORIZATION=Bearer <live-token>`,
+   `CONTENT_SERVICE_HOME_ENTRY=<page-with-products-list>`.
+
+4. **Smoke test the placeholder** — `GET /home?path=<page>` with `x-authenticated: true` and
+   `x-user-id: <valid-ATG-id>`. Verify:
+   - The block appears in `blocks[]` with `kind: DYNAMIC`.
+   - `resolutionUrl` points to `/home/blocks/products-list/<blockId>`.
+   - `status: AVAILABLE` (feature flag `products-list-salesforce` is `true`).
+
+5. **Smoke test the resolution** — `GET /home/blocks/products-list/<blockId>` with the same
+   session headers. Verify: 200, `products[]` non-empty, each product has `sku`, `title`, `price`.
+
+6. **CB test** — set `SALESFORCE_AUTHORIZATION=Bearer invalid` and fire > 20 requests; confirm
+   the breaker opens and subsequent calls return 503 without hitting Salesforce.
+
+Effort: ~0.5 day (blocked until a CMS page with `products_list` blocks is identified).
 
 ---
 

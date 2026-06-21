@@ -46,7 +46,7 @@
 | **12 — SEO / page metadata** | ✅ Complete | `pageTitle` + `seo{}` added to `HomeDefinition`, `HomePage`, `HomePageResponse`; extracted from top-level CMS response in `ContentServiceClient`. 70 tests / 0 failures. |
 | **13 — Channel/audience validation** | ✅ Complete | Template-based routing confirmed from BFF gap analysis. All production home blocks omit filter fields → defaults are permissive. `container_guest` is frontend-rendered. ADR-011 added. No code changes. |
 | **14 — GlobalData endpoint** | ✅ Complete | `GET /global-data` — separate endpoint, Caffeine L1 cache, own `"global-data"` CB. `GlobalData` domain record, `GetGlobalDataService`, `GlobalDataClient`, `GlobalDataController`. 101 tests / 0 failures. |
-| 15 — Salesforce e2e | ⬜ | Find Salesforce block in CMS; validate full dynamic flow. |
+| **15 — Salesforce adapter validation** | ✅/⬜ | Unit/contract: `ProductsListAdapterTest` (13) + `ProductsListResolveControllerTest` (10). Live e2e: blocked — no CMS page with `products_list` blocks identified. Runbook in gap-analysis. 124 tests / 0 failures. |
 | 16 — Header/footer strategy | ⬜ | Bundle vs. dedicated endpoint decision + implementation. | 56 tests across 7 test classes, 0 failures. `./mvnw clean verify` → BUILD SUCCESS. Key fixes: `@Qualifier("contentServiceRestClient")` on `ContentServiceClient`, `ConstraintViolationException` handler added to `GlobalExceptionHandler`, Spring Boot 4.1 package `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`, `lenient()` stubbing for L1-hit Redis test. |
 
 **Files written so far (Phases 0–3):**
@@ -176,6 +176,23 @@
 - [ ] Testcontainers Redis IT: `StaticBlockCacheAdapter`.
 - [ ] Circuit-breaker test: >5% failures opens breaker, no retries, fallback ProblemDetail.
 - [ ] `./mvnw clean verify` green.
+
+### Phase 15 — Salesforce adapter validation ✅ (contract) / ⬜ (live e2e)
+- [x] **`ProductsListAdapterTest`** — 13 tests: guest guard (null + blank userId), request body
+      structure against Salesforce contract, `productDataMapped` path (mapped + multi-product +
+      null priceInfo), raw `products` fallback, `productDataMapped` precedence, first-campaign-only
+      consumption, all empty/null edge cases, HTTP 500 → `DynamicBlockServiceUnavailableException`.
+- [x] **`ProductsListResolveControllerTest`** — 10 tests: 200 with product items, empty list,
+      `x-request-id` echo, UUID generation, `x-user-id` forwarded / null, 502 with block context,
+      503, 500 masking, blockId too long → 400.
+- [x] **Live e2e runbook** documented in `gap-analysis.md §5 Phase 15` — 6 steps covering: CMS
+      template discovery, field-mapping confirmation (`salesforce_experience_id`), env var setup,
+      placeholder smoke test, resolution smoke test, CB trip test.
+- [x] `./mvnw clean verify` → **124 tests / 0 failures**.
+
+**Blocked (external gate):** No CMS page entry with `products_list` blocks identified in the
+production home template. Feature flag `salesforce: true` present in globalData but zero blocks
+in the authenticated home response. Live e2e requires a page path — see runbook.
 
 ### Phase 14 — GlobalData endpoint ✅
 - [x] **Domain model** — `GlobalData` record (`locale`, `featureFlags`, `publicVariables`, `themes`
