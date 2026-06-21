@@ -28,26 +28,40 @@ GET /content/{contentType}/{locale}/{id}
 
 ### Response structure
 
+**Production schema** (`template.blocks[]` — flat array):
+
 ```json
 {
+  "page_title": "Liverpool — Tienda Online",
+  "seo": { "meta_description": "...", "no_index": false },
   "template": {
-    "top_layout":    [ { "_uid": "...", "_content_type_uid": "banner", ... } ],
-    "layout":        [ { ... } ],
-    "bottom_layout": [ { ... } ]
+    "blocks": [
+      { "uid": "blt...", "_content_type_uid": "hero_banner_slider", "title": "...", "banners": [ ... ] },
+      { "uid": "blt...", "_content_type_uid": "container", "type": "default", "blocks": [ ... ] }
+    ]
   }
 }
 ```
 
-Blocks from `top_layout`, `layout`, and `bottom_layout` are merged in that order. Each block
-carries at least:
+**Legacy schema** (falls back to merged `top_layout + layout + bottom_layout` with `_uid` field —
+present in older Contentstack entries).
+
+Top-level fields extracted:
+
+| Field | Mapped to |
+|---|---|
+| `page_title` | `HomeDefinition.pageTitle()` → `HomePageResponse.pageTitle` |
+| `seo` | `HomeDefinition.seo()` → `HomePageResponse.seo` (opaque map) |
+
+Each block in `template.blocks[]` carries at minimum:
 
 | Field | Description |
 |---|---|
-| `_uid` | Contentstack block uid (used as `blockId`) |
-| `_content_type_uid` | Maps to `BlockType` (e.g., `banner`, `products_list`) |
-| `audience_filter` | `"logged"`, `"guest"`, or `"all"` (absent = `all`) |
-| `enable_on_web` | boolean; blocks with `false` are excluded from the WEB channel |
-| `enable_on_apps` | boolean; blocks with `false` are excluded from the APPS channel |
+| `uid` | Contentstack block uid (used as `blockId`); legacy entries use `_uid` |
+| `_content_type_uid` | Maps to `BlockType` (e.g., `hero_banner_slider`, `products_list`) |
+| `audience_filter` | `"logged"`, `"guest"`, or `"all"` (absent = defaults to `all`) |
+| `enable_on_web` | boolean; absent = defaults to `true` (home template omits these) |
+| `enable_on_apps` | boolean; absent = defaults to `true` |
 
 ### Error handling
 
@@ -179,3 +193,130 @@ validates a JWT or session token itself.
 | `x-preview` | Presence triggers Contentstack preview content | Absent = live content |
 
 Adapter: `adapter/outbound/session/SessionContextAdapter` (`@RequestScope`).
+
+---
+
+## 5. Block content schemas (`GET /home` response)
+
+`BlockContentNormalizer` (`adapter/inbound/rest/mapper/`) strips CMS system metadata and normalises
+field names before the block is serialised. The table below documents the content contract per
+`blockType`. Fields marked **assumed** are based on the BFF gap-analysis comparison and standard
+Contentstack conventions — validate against live CMS schema when integrating (see Phase 13).
+
+### Universal fields stripped from all blocks
+
+`_version`, `ACL`, `_in_progress`, `created_at`, `updated_at`, `created_by`, `updated_by`,
+`publish_details`, `audience_filter`, `enable_on_web`, `enable_on_apps`.
+
+---
+
+### `HERO_BANNER_SLIDER`
+
+```json
+{
+  "title": "string | null",
+  "banners": [
+    {
+      "uid":            "string — Contentstack block uid",
+      "type":           "string — e.g. \"full-width\" (assumed)",
+      "title":          "string | null",
+      "imageUrl":       "string — extracted from CMS asset object (image.url)",
+      "mobileImageUrl": "string — extracted from CMS asset object (mobile_image.url)",
+      "button":         { "label": "string", "url": "string" },
+      "video":          "object | omitted — present only when the CMS entry has a video"
+    }
+  ]
+}
+```
+
+CMS source fields renamed: `image` → `imageUrl`, `mobile_image` → `mobileImageUrl`,
+`cta_button` → `button`.
+
+---
+
+### `CONTAINER`
+
+```json
+{
+  "type":    "string — e.g. \"default\" (assumed)",
+  "title":   "string | null",
+  "columns": { "desktop": "number | null", "mobile": "number | null", "tablet": "number | null" },
+  "children": [
+    "object — CMS system fields stripped; per-child-type field mapping is a follow-on (Phase 13)"
+  ]
+}
+```
+
+CMS source fields renamed: `blocks` → `children`, `desktop_columns / mobile_columns /
+tablet_columns` → `columns.{desktop,mobile,tablet}` (assumed column field names).
+
+---
+
+### `CONTAINER_GUEST`
+
+```json
+{
+  "title":       "string | null",
+  "description": "string | null",
+  "imageUrl":    "string — extracted from CMS asset object (image.url)",
+  "buttonLabel": "string | null (assumed CMS field: button_label)"
+}
+```
+
+---
+
+### `BAND`
+
+```json
+{
+  "title": "string | null",
+  "items": [
+    {
+      "imageUrl": "string — extracted from CMS asset object (image.url)",
+      "label":    "string | null",
+      "url":      "string | null"
+    }
+  ]
+}
+```
+
+CMS source field renamed: `content_list` → `items`.
+
+---
+
+### `CARD_SLIDER`
+
+```json
+{
+  "title": "string | null",
+  "cards": [
+    {
+      "title":    "string | null",
+      "imageUrl": "string — extracted from CMS asset object (image.url)",
+      "url":      "string | null",
+      "button":   { "label": "string", "url": "string" }
+    }
+  ]
+}
+```
+
+CMS source field renamed: `cta_button` → `button` (omitted when absent).
+
+---
+
+### `USER_GENERATED_CONTENT`
+
+```json
+{
+  "title":       "string | null",
+  "hashtag":     "string | null (assumed)",
+  "description": "string | null",
+  "cta":         "object | omitted — present only when the CMS entry has a CTA (assumed)"
+}
+```
+
+---
+
+### `BANNER` / `UNKNOWN`
+
+Passthrough: CMS system fields stripped; all remaining fields forwarded as-is. No field renaming.

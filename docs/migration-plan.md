@@ -42,7 +42,7 @@
 | 8 — Docs | ✅ Complete | architecture.md, decisions.md (10 ADRs), integrations.md, deployment.md, changelog.md, error-handling.md all written. |
 | 9 — Tests & verify | ✅ Complete | 56 tests / 0 failures. |
 | **10 — Fix CMS schema (P0)** | ✅ Complete | `template.blocks[]` primary + legacy fallback; absent channel flags default to `true`; `uid`/`_uid` dual-read; 6 real BlockTypes added. 59 tests / 0 failures. |
-| 11 — Block content contracts | ⬜ | Per-type field mapping for all 6 production types. |
+| **11 — Block content contracts** | ✅ Complete | `BlockContentNormalizer` strips CMS metadata and renames fields for all 6 production types. Schemas documented in `integrations.md §5`. 16 new tests. |
 | **12 — SEO / page metadata** | ✅ Complete | `pageTitle` + `seo{}` added to `HomeDefinition`, `HomePage`, `HomePageResponse`; extracted from top-level CMS response in `ContentServiceClient`. 70 tests / 0 failures. |
 | 13 — Channel/audience validation | ⬜ | Confirm CMS filtering mechanism with content team. |
 | 14 — GlobalData endpoint | ⬜ | Feature flags, public_variables, themes. |

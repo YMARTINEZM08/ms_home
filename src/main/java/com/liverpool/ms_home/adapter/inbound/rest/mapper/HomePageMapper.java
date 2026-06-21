@@ -16,6 +16,8 @@ import com.liverpool.ms_home.domain.model.home.StaticBlock;
  *
  * <p>Uses sealed-interface pattern matching (Java 21) to exhaustively convert each {@link HomeBlock}
  * variant — a compile-time guarantee that no new block shape can be silently ignored (Rule 15).
+ * Static block content is normalised by {@link BlockContentNormalizer} before serialisation:
+ * CMS system fields are stripped and known field names are renamed to camelCase.
  * No business logic lives here: ordering from the domain is preserved as-is (Rule 18).</p>
  */
 @Component
@@ -23,6 +25,12 @@ public class HomePageMapper {
 
     private static final String KIND_STATIC = "STATIC";
     private static final String KIND_DYNAMIC = "DYNAMIC";
+
+    private final BlockContentNormalizer contentNormalizer;
+
+    public HomePageMapper(BlockContentNormalizer contentNormalizer) {
+        this.contentNormalizer = contentNormalizer;
+    }
 
     /**
      * Converts a composed {@link HomePage} to its REST representation.
@@ -51,7 +59,7 @@ public class HomePageMapper {
                     s.blockId(),
                     s.blockType().name(),
                     KIND_STATIC,
-                    s.content(),
+                    contentNormalizer.normalize(s.blockType(), s.content()),
                     null,
                     null,
                     null,

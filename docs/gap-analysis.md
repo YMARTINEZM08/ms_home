@@ -227,20 +227,26 @@ Effort: ~0.5 day.
 
 ---
 
-### Phase 11 — Block content contract per type
+### Phase 11 — Block content contract per type ✅
 **Scope:** Each block type exposes a clean, documented content payload (not raw CMS blob).
 
-- [ ] Define a `BlockContentMapper` per block type that strips CMS metadata, renames fields.
-- [ ] `hero_banner_slider` → `{ title, banners[{type,imageUrl,mobileImageUrl,button{label,url},title,video?}] }`
-- [ ] `container` → `{ type, title, columns{desktop,mobile,tablet}, children[<recursively mapped>] }`
-- [ ] `container_guest` → `{ title, description, imageUrl, buttonLabel }`
-- [ ] `band` → `{ title, items[{imageUrl,label,url}] }`
-- [ ] `card_slider` → `{ title, cards[{title,imageUrl,url,button?}] }`
-- [ ] `user_generated_content` → `{ title, hashtag, description, cta? }`
-- [ ] Add per-type `HomeBlockResponse` subtypes **or** keep `Map<String,Object>` with documented schema.
-- [ ] Update `HomePageMapperTest` for all types.
+- [x] `BlockContentNormalizer` — single component in `adapter/inbound/rest/mapper/`; dispatches by `BlockType`; strips universal CMS system metadata from all types.
+- [x] `hero_banner_slider` → `{ title, banners[{uid,type,title,imageUrl,mobileImageUrl,button?,video?}] }`
+- [x] `container` → `{ type, title, columns{desktop,mobile,tablet}, children[stripped] }`
+- [x] `container_guest` → `{ title, description, imageUrl, buttonLabel }`
+- [x] `band` → `{ title, items[{imageUrl,label,url}] }` (CMS `content_list` → `items`)
+- [x] `card_slider` → `{ title, cards[{title,imageUrl,url,button?}] }`
+- [x] `user_generated_content` → `{ title, hashtag, description, cta? }`
+- [x] Kept `Map<String,Object>` content type — schemas documented in `integrations.md §5`.
+- [x] `BlockContentNormalizerTest` — 16 tests covering all 6 types + universal metadata stripping + unknown passthrough.
+- [x] `HomePageMapper` now injects `BlockContentNormalizer`; `HomePageMapperTest` updated.
 
-Effort: ~2–3 days.
+**Open (Phase 13 follow-on):** Some field names assumed from Contentstack conventions and BFF gap
+analysis — `desktop_columns`, `mobile_columns`, `tablet_columns`, `button_label`, `cards`,
+`hashtag`, `cta` — need validation against live CMS schema. `container.children[]` are
+metadata-stripped but not deeply typed; per-child-type mapping pending child schema confirmation.
+
+Effort: ~2 days.
 
 ---
 

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import com.liverpool.ms_home.adapter.inbound.rest.dto.HomeBlockResponse;
 import com.liverpool.ms_home.adapter.inbound.rest.dto.HomePageResponse;
+import com.liverpool.ms_home.adapter.inbound.rest.mapper.BlockContentNormalizer;
 import com.liverpool.ms_home.domain.model.home.BlockType;
 import com.liverpool.ms_home.domain.model.home.DynamicBlockStatus;
 import com.liverpool.ms_home.domain.model.home.DynamicPlaceholder;
@@ -22,7 +23,7 @@ class HomePageMapperTest {
 
     @BeforeEach
     void setUp() {
-        mapper = new HomePageMapper();
+        mapper = new HomePageMapper(new BlockContentNormalizer());
     }
 
     // ── static blocks ────────────────────────────────────────────────────────────────────────────
