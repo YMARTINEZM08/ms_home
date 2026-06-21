@@ -290,13 +290,38 @@ Effort: 0.5 day (documentation + ADR).
 
 ---
 
-### Phase 14 — GlobalData endpoint
+### Phase 14 — GlobalData endpoint ✅
 **Scope:** Serve the global config the frontend needs (feature flags, public variables, themes).
 
-- [ ] Design: should globalData be bundled in `GET /home` response or a separate `GET /global`?
-- [ ] Add `globalData` to `ContentPort` or a new `GlobalDataPort`.
-- [ ] Serve at minimum: `feature_flags`, `public_variables`, `site_domain`.
-- [ ] Consider caching strategy (globalData changes rarely; long L1+L2 TTL appropriate).
+- [x] **Separate `GET /global-data` endpoint** — not bundled in `/home` (clean separation: page
+      layout vs. site-wide config; independent cache TTLs; independent circuit breaker).
+- [x] **`GlobalData` domain record** — `{ locale, featureFlags, publicVariables, themes }` (all
+      maps non-null; empty when CMS key absent).
+- [x] **`GlobalDataQuery`** — `{ brand, locale, preview }` derived from session context.
+- [x] **`GetGlobalDataUseCase` / `GlobalDataPort`** — inbound/outbound port pair (ADR-002).
+- [x] **`GetGlobalDataService`** — cache-aside with Caffeine L1 (no Redis L2 needed; payload is
+      small and session-independent; 15-min default TTL configurable via
+      `CONTENT_SERVICE_GLOBAL_DATA_CACHE_TTL`).
+- [x] **`GlobalDataClient`** — reuses `contentServiceRestClient` (same pool + interceptor); its own
+      `"global-data"` circuit breaker so globalData failures never trip the home-page breaker
+      (ADR-004). 404 → 502 (config error), 5xx → 502, CB open → 503.
+- [x] **`GlobalDataController`** — `GET /global-data`; reads brand/locale from session context;
+      preview mode via configurable header; echoes `x-request-id`.
+- [x] **`ContentstackProperties`** extended with 3 new fields:
+      `globalDataContentType`, `globalDataEntryId`, `globalDataCacheTtl`.
+- [x] **`CacheConfig`** — new `globalDataL1Cache` bean (Caffeine, 15-min TTL, max 50 entries).
+- [x] **`application.yaml`** — env vars:
+      `CONTENT_SERVICE_GLOBAL_DATA_TYPE` (default `global_data`),
+      `CONTENT_SERVICE_GLOBAL_DATA_ENTRY` (default `global_data`),
+      `CONTENT_SERVICE_GLOBAL_DATA_CACHE_TTL` (default `15m`).
+- [x] **`GlobalDataClientTest`** — 7 tests: happy path, preview mode, absent keys, URL format,
+      HTTP 404, HTTP 500, circuit-breaker trip.
+- [x] **`GlobalDataControllerTest`** — 9 tests: 200 with payload, empty maps, request-id echo,
+      UUID generation, preview flag propagation, 502, 503, 500 masking.
+
+**Open:** CMS team confirmation of exact `global_data` entry id and locale-specific content
+structure. `header` and `footer` fields (present in BFF `globalData`) are not yet surfaced —
+addressed in Phase 16.
 
 Effort: ~1 day.
 

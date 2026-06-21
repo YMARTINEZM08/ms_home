@@ -43,7 +43,8 @@ class StaticBlockCacheAdapterTest {
     private static final ContentstackProperties PROPS = new ContentstackProperties(
             "http://localhost:8082", "LP", "x-preview",
             Duration.ofSeconds(2), Duration.ofSeconds(5),
-            "page", "home", Duration.ofMinutes(5), Duration.ofSeconds(30));
+            "page", "home", Duration.ofMinutes(5), Duration.ofSeconds(30),
+            "global_data", "global_data", Duration.ofMinutes(15));
 
     private static final ContentQuery QUERY = new ContentQuery("LP", "es-mx", "home", false);
     private static final String CACHE_KEY = "home:def:LP:es-mx:home:false";

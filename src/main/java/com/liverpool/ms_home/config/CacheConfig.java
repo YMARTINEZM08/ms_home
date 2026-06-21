@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.liverpool.ms_home.domain.model.content.HomeDefinition;
+import com.liverpool.ms_home.domain.model.globaldata.GlobalData;
 
 /**
  * Configures the Caffeine L1 in-process cache for static Home definitions (Rule 4 — low latency).
@@ -34,6 +35,28 @@ public class CacheConfig {
         return Caffeine.newBuilder()
                 .expireAfterWrite(properties.l1CacheTtl().toSeconds(), TimeUnit.SECONDS)
                 .maximumSize(200)
+                .recordStats()
+                .build();
+    }
+
+    /**
+     * In-process Caffeine cache for {@link GlobalData} objects.
+     *
+     * <p>GlobalData changes far less frequently than page definitions — feature flags and public
+     * variables are updated by the CMS team at most a few times per day. A 15-minute L1 TTL
+     * (configurable via {@code CONTENT_SERVICE_GLOBAL_DATA_CACHE_TTL}) keeps memory pressure
+     * minimal while still allowing timely propagation of CMS updates. No Redis L2 is used for
+     * GlobalData: the payload is small, session-independent, and a single origin miss per pod per
+     * TTL period is acceptable.</p>
+     *
+     * @param properties content-service config supplying {@code globalDataCacheTtl}
+     * @return the configured Caffeine cache
+     */
+    @Bean
+    public Cache<String, GlobalData> globalDataL1Cache(ContentstackProperties properties) {
+        return Caffeine.newBuilder()
+                .expireAfterWrite(properties.globalDataCacheTtl().toSeconds(), TimeUnit.SECONDS)
+                .maximumSize(50)
                 .recordStats()
                 .build();
     }

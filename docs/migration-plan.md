@@ -45,7 +45,7 @@
 | **11 — Block content contracts** | ✅ Complete | `BlockContentNormalizer` strips CMS metadata and renames fields for all 6 production types. Schemas documented in `integrations.md §5`. 16 new tests. |
 | **12 — SEO / page metadata** | ✅ Complete | `pageTitle` + `seo{}` added to `HomeDefinition`, `HomePage`, `HomePageResponse`; extracted from top-level CMS response in `ContentServiceClient`. 70 tests / 0 failures. |
 | **13 — Channel/audience validation** | ✅ Complete | Template-based routing confirmed from BFF gap analysis. All production home blocks omit filter fields → defaults are permissive. `container_guest` is frontend-rendered. ADR-011 added. No code changes. |
-| 14 — GlobalData endpoint | ⬜ | Feature flags, public_variables, themes. |
+| **14 — GlobalData endpoint** | ✅ Complete | `GET /global-data` — separate endpoint, Caffeine L1 cache, own `"global-data"` CB. `GlobalData` domain record, `GetGlobalDataService`, `GlobalDataClient`, `GlobalDataController`. 101 tests / 0 failures. |
 | 15 — Salesforce e2e | ⬜ | Find Salesforce block in CMS; validate full dynamic flow. |
 | 16 — Header/footer strategy | ⬜ | Bundle vs. dedicated endpoint decision + implementation. | 56 tests across 7 test classes, 0 failures. `./mvnw clean verify` → BUILD SUCCESS. Key fixes: `@Qualifier("contentServiceRestClient")` on `ContentServiceClient`, `ConstraintViolationException` handler added to `GlobalExceptionHandler`, Spring Boot 4.1 package `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`, `lenient()` stubbing for L1-hit Redis test. |
 
@@ -176,6 +176,23 @@
 - [ ] Testcontainers Redis IT: `StaticBlockCacheAdapter`.
 - [ ] Circuit-breaker test: >5% failures opens breaker, no retries, fallback ProblemDetail.
 - [ ] `./mvnw clean verify` green.
+
+### Phase 14 — GlobalData endpoint ✅
+- [x] **Domain model** — `GlobalData` record (`locale`, `featureFlags`, `publicVariables`, `themes`
+      — all maps guaranteed non-null; empty when CMS key absent); `GlobalDataQuery` record.
+- [x] **Ports** — `GetGlobalDataUseCase` (inbound) + `GlobalDataPort` (outbound).
+- [x] **Application service** — `GetGlobalDataService` with Caffeine L1 cache-aside (no Redis L2
+      needed; globalData is session-independent and small; 15-min TTL default).
+- [x] **Outbound adapter** — `GlobalDataClient`: reuses `contentServiceRestClient` bean; own
+      `"global-data"` circuit breaker (independent of `"content-service"`); extracts
+      `feature_flags`, `public_variables`, `themes` from CMS response top-level; 404 → 502, CB open → 503.
+- [x] **REST layer** — `GlobalDataController` (`GET /global-data`); session context for brand/locale;
+      preview header; `x-request-id` echo; `GlobalDataResponse` DTO; `GlobalDataMapper`.
+- [x] **Config** — `ContentstackProperties` + 3 globalData fields; `application.yaml` + 3 env vars;
+      `CacheConfig` + `globalDataL1Cache` Caffeine bean.
+- [x] **Tests** — `GlobalDataClientTest` (7 tests), `GlobalDataControllerTest` (9 tests);
+      `ContentServiceClientTest` and `StaticBlockCacheAdapterTest` updated for new PROPS constructor.
+- [x] `./mvnw clean verify` → **101 tests / 0 failures**.
 
 ---
 

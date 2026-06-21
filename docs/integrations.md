@@ -82,7 +82,70 @@ TTL: Redis `CONTENT_SERVICE_CACHE_TTL` (default 5 min), Caffeine `CONTENT_SERVIC
 
 ---
 
-## 2. Salesforce Evergage (personalised product recommendations)
+## 2. content-service — GlobalData
+
+### Role
+Provides site-wide CMS configuration consumed by every page: feature flags, public runtime
+variables, and brand theme tokens. Served via `GET /global-data`, separate from the Home page
+layout so each has its own cache TTL and circuit breaker.
+
+### Contract
+
+```
+GET /content/{globalDataContentType}/{locale}/{globalDataEntryId}
+```
+
+| Element | Value |
+|---|---|
+| Base URL | `CONTENT_SERVICE_BASE_URL` (shared with Home) |
+| `{globalDataContentType}` | `CONTENT_SERVICE_GLOBAL_DATA_TYPE` (default `global_data`) |
+| `{locale}` | locale from session context (e.g., `es-mx`) |
+| `{globalDataEntryId}` | `CONTENT_SERVICE_GLOBAL_DATA_ENTRY` (default `global_data`) |
+| `x-brand-id` header | brand from session; appended with `-PREVIEW` when preview mode |
+
+### Response structure
+
+```json
+{
+  "feature_flags":    { "salesforce": true, "personalization": false, ... },
+  "public_variables": { "site_domain": "https://www.liverpool.com.mx", ... },
+  "themes":           { "primary_color": "#E31837", ... }
+}
+```
+
+Top-level keys extracted:
+
+| CMS key | Mapped to |
+|---|---|
+| `feature_flags` | `GlobalData.featureFlags()` → `GlobalDataResponse.featureFlags` |
+| `public_variables` | `GlobalData.publicVariables()` → `GlobalDataResponse.publicVariables` |
+| `themes` | `GlobalData.themes()` → `GlobalDataResponse.themes` |
+
+Absent keys default to empty maps (`{}`). Additional top-level keys (e.g. `header`, `footer`) are
+not yet mapped — planned in Phase 16.
+
+### Error handling
+
+| Condition | Adapter behaviour |
+|---|---|
+| HTTP 404 | Throws `ContentServiceUnavailableException` (502) — 404 indicates a config error (wrong entry id or locale), not a user error |
+| HTTP 4xx/5xx | Throws `ContentServiceUnavailableException` (502) |
+| I/O failure | Throws `ContentServiceUnavailableException` (502) |
+| CB open | Throws `ServiceUnavailableException` (503) |
+
+### Adapter
+`adapter/outbound/contentstack/GlobalDataClient` — circuit breaker: `"global-data"` (independent
+from the Home-page `"content-service"` breaker so a GlobalData failure never affects page loads).
+
+### Caching
+Caffeine L1 only (no Redis L2). Key: `global:def:{brand}:{locale}:{preview}`.
+TTL: `CONTENT_SERVICE_GLOBAL_DATA_CACHE_TTL` (default 15 min).
+GlobalData changes rarely and the payload is small (~1–5 KB) — one origin miss per instance per
+TTL period is acceptable, making Redis L2 an unnecessary dependency.
+
+---
+
+## 4. Salesforce Evergage (personalised product recommendations)
 
 ### Role
 Returns a personalised product carousel for the `products_list` block. Requires an authenticated
@@ -146,7 +209,7 @@ The `Authorization` header value is injected from `SALESFORCE_AUTHORIZATION` at 
 
 ---
 
-## 3. Redis (L2 cache)
+## 5. Redis (L2 cache)
 
 ### Role
 Shared, durable cache for `HomeDefinition` objects. Prevents cache stampede on pod restart and
@@ -176,7 +239,7 @@ no error surfaced to the client.
 
 ---
 
-## 4. Upstream API Gateway (inbound headers)
+## 6. Upstream API Gateway (inbound headers)
 
 ms-home trusts the API gateway to authenticate the session and forward context headers. It never
 validates a JWT or session token itself.
@@ -196,7 +259,7 @@ Adapter: `adapter/outbound/session/SessionContextAdapter` (`@RequestScope`).
 
 ---
 
-## 5. Block content schemas (`GET /home` response)
+## 7. Block content schemas (`GET /home` response)
 
 `BlockContentNormalizer` (`adapter/inbound/rest/mapper/`) strips CMS system metadata and normalises
 field names before the block is serialised. The table below documents the content contract per

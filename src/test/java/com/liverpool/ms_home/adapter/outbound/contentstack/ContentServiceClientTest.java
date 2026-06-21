@@ -37,7 +37,8 @@ class ContentServiceClientTest {
     private static final ContentstackProperties PROPS = new ContentstackProperties(
             BASE_URL, "LP", "x-preview",
             Duration.ofSeconds(2), Duration.ofSeconds(5),
-            "page", "home", Duration.ofMinutes(5), Duration.ofSeconds(30));
+            "page", "home", Duration.ofMinutes(5), Duration.ofSeconds(30),
+            "global_data", "global_data", Duration.ofMinutes(15));
 
     private static final ContentQuery QUERY = new ContentQuery("LP", "es-mx", "", false);
     // path="" → homeEntryId "home" is used

@@ -58,6 +58,9 @@ content-service:
   home-entry-id: ${CONTENT_SERVICE_HOME_ENTRY:home}
   cache-ttl: ${CONTENT_SERVICE_CACHE_TTL:5m}
   l1-cache-ttl: ${CONTENT_SERVICE_L1_CACHE_TTL:30s}
+  global-data-content-type: ${CONTENT_SERVICE_GLOBAL_DATA_TYPE:global_data}
+  global-data-entry-id: ${CONTENT_SERVICE_GLOBAL_DATA_ENTRY:global_data}
+  global-data-cache-ttl: ${CONTENT_SERVICE_GLOBAL_DATA_CACHE_TTL:15m}
 
 # User requirement — circuit breakers: 5% failure-rate threshold, NO retries.
 # Consumed programmatically by Resilience4jConfig (core Resilience4j, not the Spring-AOP starter).
